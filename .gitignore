@@ -1,0 +1,48 @@
+# ===== Build output (everything compiles into build/) =====
+build/
+
+# ===== Native build artifacts, wherever they appear =====
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+*.lib
+*.dll
+*.exp
+
+# ===== Generated C from the M1 compiler =====
+*_gen.c
+*_out.c
+tests/generated_c/
+
+# ===== Debug session dumps =====
+_m1_*.txt
+_m1c_*.txt
+_out.txt
+out.txt
+*_err.txt
+*_err[0-9].txt
+*stderr*.txt
+*stdout*.txt
+tests/debug_logs/
+
+# ===== Test runner scratch =====
+tests/build/*
+!tests/build/run_tests.ps1
+
+# ===== Editor / OS noise =====
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# ===== Exceptions: real source that must never be ignored =====
+!src/m0_runtime.c
+!src/runtime/m0_runtime.c
+!src/m1/release/m0_runtime.c
+
+# ===== Paper evidence: frozen research artifacts, always committed =====
+!paper/evidence/
+!paper/evidence/**
