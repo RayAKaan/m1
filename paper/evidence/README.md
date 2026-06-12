@@ -15,7 +15,7 @@ permanent, committed record of the research results.
 
 ## Provenance
 
-- **Commit hash**: `git rev-parse HEAD` at time of cleanup
+- **Commit hash**: `4e13ebd86317324c6d3f2e0617ca5565a6d820f0`
 - **Tag**: `paper-evidence` (points to the pre-cleanup snapshot)
 - **Date**: June 12, 2026
 - **Compiler**: `m1c.exe` (308KB, June 5, 2026)
