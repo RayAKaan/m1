@@ -1,0 +1,12 @@
+module Test {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_string_len" : String -> Int
+
+    fn is_digit(c : Int) -> Bool {
+        (c >= 48) /\ (c <= 57)
+    }
+
+    fn is_space(c : Int) -> Bool {
+        (c == 32) \/ (c == 9) \/ (c == 10) \/ (c == 13)
+    }
+}

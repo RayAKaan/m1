@@ -1,0 +1,8 @@
+world WillErrorTest {
+    do main() -> Int {
+        set live order : Int = 0;
+        set _ : Int = will order == 1;
+        set _ : Int = order = 2;
+        0
+    }
+}

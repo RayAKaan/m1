@@ -1,0 +1,13 @@
+world ConflictTest {
+    do main() -> Int {
+        set live conn : State = Closed;
+        conn = Open;
+        will conn.Connecting;  -- one will
+        will conn.Connecting;  -- duplicate will (should warn)
+        when conn.Connecting {
+            say("connecting now");
+        }
+        freeze conn;
+        0
+    }
+}

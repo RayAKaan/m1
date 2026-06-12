@@ -1,0 +1,10 @@
+world ConnectionTest {
+    do main() -> Int {
+        set live conn : Int = 0;
+        conn = Open;
+        freeze conn;
+        say(int_to_string(was conn.Connecting));
+        say(int_to_string(was conn.Closed));
+        0
+    }
+}

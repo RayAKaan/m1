@@ -1,0 +1,7 @@
+module main;
+import std;
+
+do main() -> Int {
+    say(std.string_concat("a", "b"));
+    0
+}

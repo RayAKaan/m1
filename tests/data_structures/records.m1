@@ -1,0 +1,12 @@
+world Records {
+    shape Point = { x : Int, y : Int }
+    do make_point(x : Int, y : Int) -> Point {
+        set p : Point = { x = x, y = y };
+        p
+    }
+    do point_sum(p : Point) -> Int { p.x + p.y }
+    do main() -> Int {
+        set p : Point = make_point(3, 7);
+        say(int_to_string(point_sum(p)))
+    }
+}

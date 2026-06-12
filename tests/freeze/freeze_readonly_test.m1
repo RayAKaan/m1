@@ -1,0 +1,11 @@
+world FreezeReadTest {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        set live x : Int = 100;
+        set _ : Int = freeze x;
+        set y : Int = x + 1;
+        say(int_to_string(y))
+    }
+}

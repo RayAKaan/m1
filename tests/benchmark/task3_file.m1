@@ -1,0 +1,15 @@
+world FileTest {
+    do main() -> Int {
+        set Closed : Int = 0;
+        set Open : Int = 1;
+
+        set live file : Int = Closed;
+        set _ : Int = now file >= 0;
+        set _ : Int = will file.Open;
+        set _ : Int = file = Open;
+        set _ : Int = say(int_to_string(was file.Open));
+        set _ : Int = when file == Closed then { say("closed") };
+        set _ : Int = file = Closed;
+        0
+    }
+}

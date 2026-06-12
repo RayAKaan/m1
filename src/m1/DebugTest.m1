@@ -1,0 +1,6 @@
+world DebugTest {
+    do f(x : Int) -> Int {
+        if x < 0 { return 0; }
+        x + 1
+    }
+}

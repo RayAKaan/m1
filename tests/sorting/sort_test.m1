@@ -1,0 +1,17 @@
+world SortTest {
+    do main() -> Int {
+        set v : Int = vector_new();
+        set live i : Int = 0;
+        set _ : Int = while i < 5 {
+            set _ : Int = vector_push(v, 5 - i);
+            i = i + 1
+        };
+        set _ : Int = vector_sort(v);
+        set live j : Int = 0;
+        set _ : Int = while j < vector_len(v) {
+            set _ : Int = say(int_to_string(vector_get(v, j)));
+            j = j + 1
+        };
+        0
+    }
+}

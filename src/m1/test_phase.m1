@@ -1,0 +1,5 @@
+world Test {
+    do main() -> Int {
+        0
+    }
+}

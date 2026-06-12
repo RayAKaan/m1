@@ -1,0 +1,9 @@
+[M1] start
+[M1] file read
+[M1] parsed
+#include <stdio.h>
+#include <stdint.h>
+
+
+int64_t m0_read_file;
+

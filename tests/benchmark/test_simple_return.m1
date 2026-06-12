@@ -1,0 +1,6 @@
+world TestReturn {
+    do main() -> Int {
+        return 0;
+        1
+    }
+}

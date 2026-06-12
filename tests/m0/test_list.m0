@@ -1,0 +1,3 @@
+module Test {
+type Foo = { items : List, count : Int }
+}

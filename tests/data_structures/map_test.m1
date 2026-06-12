@@ -1,0 +1,15 @@
+world MapTest {
+    do main() -> Int {
+        set m : Int = map_new();
+        set _ : Int = map_set(m, 2, 100);
+        set _ : Int = map_set(m, 7, 200);
+        set _ : Int = map_set(m, 11, 300);
+        set _ : Int = map_set(m, 15, 400);
+        set _ : Int = say(int_to_string(map_get(m, 2)));
+        set _ : Int = say(int_to_string(map_get(m, 7)));
+        set _ : Int = say(int_to_string(map_get(m, 11)));
+        set _ : Int = say(int_to_string(map_get(m, 15)));
+        set _ : Int = say(int_to_string(map_len(m)));
+        0
+    }
+}

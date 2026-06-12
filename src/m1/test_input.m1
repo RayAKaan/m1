@@ -1,0 +1,7 @@
+module Test {
+    external "func1" : Int -> Int
+    external "func2" : Int -> Int
+    external "func3" : Int -> Int
+    external "func4" : Int -> Int
+    let X : Int = 42
+}

@@ -1,0 +1,5 @@
+module test;
+do foo(x : Int) -> Int {
+    set live y : Int = x + 1;
+    y
+}

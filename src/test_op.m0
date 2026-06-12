@@ -1,0 +1,5 @@
+module Test {
+    fn foo(x : Int) -> Bool {
+        (x >= 48) /\ (x <= 57)
+    }
+}

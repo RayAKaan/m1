@@ -1,0 +1,6 @@
+module bank;
+do create_account(initial : Int) -> Int {
+    set live balance : Int = initial;
+    set _ : Int = now balance >= 0;
+    balance
+}

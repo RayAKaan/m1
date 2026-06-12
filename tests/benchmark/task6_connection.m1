@@ -1,0 +1,11 @@
+world ConnectionTest {
+    do main() -> Int {
+        set Offline : Int = 0;
+        set Online : Int = 1;
+        set live conn : Int = Online;
+        set _ : Int = when conn == Offline then { say("disconnected") };
+        set _ : Int = will conn == Offline;
+        set _ : Int = conn = Offline;
+        say("done")
+    }
+}

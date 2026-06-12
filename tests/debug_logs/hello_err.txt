@@ -1,0 +1,8 @@
+_hello_test.c:7:10: error: call to undeclared function 'println'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    7 |   return println("Hello, World");
+      |          ^
+_hello_test.c:7:10: note: did you mean 'printf'?
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt\stdio.h:950:37: note: 'printf' declared here
+  950 |     _CRT_STDIO_INLINE int __CRTDECL printf(
+      |                                     ^
+1 error generated.

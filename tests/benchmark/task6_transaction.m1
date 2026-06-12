@@ -1,0 +1,19 @@
+world TransactionTest {
+    do main() -> Int {
+        set Idle : Int = 0;
+        set Active : Int = 1;
+        set Committed : Int = 2;
+        set RolledBack : Int = 3;
+
+        set live tx : Int = Idle;
+        set _ : Int = now tx >= 0;
+        set _ : Int = will tx.Committed;
+        set _ : Int = tx = Active;
+        set _ : Int = say(int_to_string(was tx.Active));
+        set _ : Int = tx = Committed;
+        set _ : Int = say(int_to_string(was tx.Committed));
+        set _ : Int = freeze tx;
+        set _ : Int = say(int_to_string(was tx.live));
+        0
+    }
+}

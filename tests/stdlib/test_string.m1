@@ -1,0 +1,14 @@
+module main;
+import std.string;
+
+do main() -> Int {
+    say(int_to_string(std.string.length(std.string.concat("hello", " world"))));
+    say(int_to_string(std.string.equals("hello world", std.string.concat("hello", " world"))));
+    say(int_to_string(std.string.starts_with(std.string.concat("hello", " world"), "hello")));
+    say(int_to_string(std.string.ends_with(std.string.concat("hello", " world"), "world")));
+    say(int_to_string(std.string.contains(std.string.concat("hello", " world"), "lo w")));
+    say(int_to_string(std.string.contains(std.string.concat("hello", " world"), "xyz")));
+    say(int_to_string(std.string.to_int("42")));
+    say(std.string.from_int(99));
+    0
+}

@@ -1,0 +1,6 @@
+module lib;
+
+do greet(name : String) -> Int {
+    say(string_concat("hello ", name));
+    0
+}

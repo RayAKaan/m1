@@ -1,0 +1,6 @@
+world Test {
+    do my_println(s : String) -> Int { m0_println(s) }
+    do main() -> Int {
+        my_println("Hello from wrapper")
+    }
+}

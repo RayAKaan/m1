@@ -1,0 +1,4 @@
+module test;
+do main() -> Int {
+    42
+}

@@ -1,0 +1,8 @@
+module app;
+import math;
+
+do main() -> Int {
+    set live result : Int = math.add(3, 4);
+    say(int_to_string(result));
+    0
+}

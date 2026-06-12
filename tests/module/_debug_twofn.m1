@@ -1,0 +1,3 @@
+module bank;
+do foo(x : Int) -> Int { x }
+do bar(y : Int) -> Int { y + 1 }

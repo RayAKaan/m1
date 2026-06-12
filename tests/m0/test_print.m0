@@ -1,0 +1,8 @@
+module TestPrint {
+    external "m0_print" : String -> Int
+
+    fn main() -> Int {
+        m0_print("hello\n");
+        0
+    }
+}

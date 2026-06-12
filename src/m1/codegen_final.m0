@@ -1,0 +1,356 @@
+    fn emit_c_expr_ea(reg : Int, l : Int, first : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        if first == 0 {
+        let p : Int = m0_print(", ");
+        } else {
+    }
+        let p : Int = emit_c_expr(reg, m0_head(l))
+        emit_c_expr_ea(reg, m0_tail(l), 0)
+
+
+    fn emit_c_expr_arms_ea(reg : Int, l : Int, first : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        let pat : Int = m0_get(m0_head(l), 0)
+        let body : Int = m0_get(m0_head(l), 1);
+        let pk : Int = m0_get(pat, 0);
+        if first == 0 {
+        let p : Int = m0_print(" else ");
+        } else {
+    }
+        if pk == P_WILD {
+        let p0 : Int = m0_print("(");
+        let p1 : Int = emit_c_expr(reg, body);
+        let _s : Int = m0_print(")");
+        } else {
+        if pk == P_LIT {
+        let p0 : Int = m0_print("(");
+        let p1 : Int = emit_c_expr(reg, m0_get(pat, 3));
+        let p2 : Int = m0_print(" == _m ? (");
+        let p3 : Int = emit_c_expr(reg, body);
+        m0_print(") : ")
+        } else {
+        if pk == P_NAME {
+        let p0 : Int = m0_print("{ int64_t ")
+        let p1 : Int = m0_print(m0_load_string(pat, 3));
+        let p2 : Int = m0_print(" = _m; (");
+        let p3 : Int = emit_c_expr(reg, body);
+        m0_print("); }")
+        } else {
+        let p0 : Int = m0_print("(");
+        let p1 : Int = emit_c_expr(reg, body);
+        m0_print(")")
+    }
+    }
+    }
+        emit_c_expr_arms_ea(reg, m0_tail(l), 0)
+
+
+    fn emit_c_expr_ef(reg : Int, l : Int, first : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        if first == 0 {
+        let p : Int = m0_print(", ")
+        } else {
+    }
+        let p0 : Int = m0_print(".")
+        let p1 : Int = m0_print(m0_load_string(m0_head(l), 0));
+        let p2 : Int = m0_print(" = ");
+        let p3 : Int = emit_c_expr(reg, m0_get(m0_head(l), 1));
+        emit_c_expr_ef(reg, m0_tail(l), 0)
+
+
+    fn emit_fn_ep(reg : Int, l : Int, first : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        if first == 0 {
+        let p : Int = m0_print(", ")
+        } else {
+    }
+        let p0 : Int = emit_c_type(reg, m0_get(m0_head(l), 1))
+        let p1 : Int = m0_print(" ");
+        let p2 : Int = m0_print(m0_load_string(m0_head(l), 0));
+        emit_fn_ep(reg, m0_tail(l), 0)
+
+
+    fn emit_c_op(op : Int) -> Int {
+        if op == OP_ADD {
+        m0_print("+")
+        } else {
+        if op == OP_SUB {
+        m0_print("-")
+        } else {
+        if op == OP_MUL {
+        m0_print("*")
+        } else {
+        if op == OP_DIV {
+        m0_print("/")
+        } else {
+        if op == OP_MOD {
+        m0_print("%")
+        } else {
+        if op == OP_EQ {
+        m0_print("==")
+        } else {
+        if op == OP_NEQ {
+        m0_print("!=")
+        } else {
+        if op == OP_LT {
+        m0_print("<")
+        } else {
+        if op == OP_GT {
+        m0_print(">")
+        } else {
+        if op == OP_LE {
+        m0_print("<=")
+        } else {
+        if op == OP_GE {
+        m0_print(">=")
+        } else {
+        if op == OP_AND {
+        m0_print("&&")
+        } else {
+        if op == OP_OR {
+        m0_print("||")
+        } else {
+        m0_print("?")
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+
+
+    fn emit_c_expr(reg : Int, e : Int) -> Int {
+        let k : Int = m0_get(e, 0)
+        if k == N_INT {
+        m0_print_int(m0_get(e, 3))
+        } else {
+        if k == N_STRING {
+        let p0 : Int = m0_print("\"")
+        let p1 : Int = m0_print(m0_load_string(e, 3));
+        m0_print("\"")
+        } else {
+        if k == N_BOOL {
+        if m0_get(e, 3) == 1) {
+        m0_print("1")
+        } else {
+        m0_print("0")
+    }
+        } else {
+        if k == N_UNIT {
+        m0_print("0")
+        } else {
+        if k == N_NAME {
+        m0_print(m0_load_string(e, 3))
+        } else {
+        if k == N_BINARY {
+        let p0 : Int = m0_print("(")
+        let p1 : Int = emit_c_expr(reg, m0_get(e, 4));
+        let p2 : Int = m0_print(" ");
+        let p3 : Int = emit_c_op(m0_get(e, 3));
+        let p4 : Int = m0_print(" ");
+        let p5 : Int = emit_c_expr(reg, m0_get(e, 5));
+        m0_print(")")
+        } else {
+        if k == N_NOT {
+        let p0 : Int = m0_print("(!")
+        let p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+        m0_print(")")
+        } else {
+        if k == N_FIELD {
+        let p0 : Int = emit_c_expr(reg, m0_get(e, 3))
+        let p1 : Int = m0_print(".");
+        m0_print(m0_load_string(e, 4))
+        } else {
+        if k == N_CALL {
+        let p0 : Int = emit_c_expr(reg, m0_get(e, 3))
+        let p1 : Int = m0_print("(");
+        let p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
+        m0_print(")")
+        } else {
+        if k == N_LET {
+        let p0 : Int = m0_print("({ ")
+        let p1 : Int = emit_c_type(reg, m0_get(e, 4));
+        let p2 : Int = m0_print(" ");
+        let p3 : Int = m0_print(m0_load_string(e, 3));
+        let p4 : Int = m0_print(" = ");
+        let p5 : Int = emit_c_expr(reg, m0_get(e, 5));
+        let p6 : Int = m0_print("; ");
+        let p7 : Int = emit_c_expr(reg, m0_get(e, 6));
+        m0_print("; })")
+        } else {
+        if k == N_IF {
+        let p0 : Int = m0_print("(");
+        let p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+        let p2 : Int = m0_print(" ? ");
+        let p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+        let p4 : Int = m0_print(" : ");
+        let el : Int = m0_get(e, 5);
+        if el != 0 {
+        let p5 : Int = emit_c_expr(reg, el);
+        } else {
+        let p5 : Int = m0_print("0");
+    }
+        m0_print(")")
+        } else {
+        if k == N_MATCH {
+        let p0 : Int = m0_print("({ int64_t _m = ")
+        let p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+        let p2 : Int = m0_print("; ");
+        let p3 : Int = emit_c_expr_arms_ea(reg, m0_get(e, 4), 1);
+        m0_print("; })")
+        } else {
+        if k == N_RECORD {
+        let r2 : Int = lookup_reg(reg, m0_load_string(e, 3));
+        let p0 : Int = m0_print("(");
+        let p1 : Int = emit_c_type(reg, reg_type(r2));
+        let p2 : Int = m0_print("){ ");
+        let p3 : Int = emit_c_expr_ef(reg, m0_get(e, 3), 1);
+        m0_print(" })")
+        } else {
+        m0_print("0")
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+
+
+    fn emit_c_params(reg : Int, params : Int) -> Int {
+        if m0_is_nil(params) == 1) {
+        0
+        } else {
+        emit_c_type(reg, m0_head(params));    int64_t rest =
+        m0_tail(params)
+        if m0_is_nil(rest) == 0) {
+        let _s : Int = m0_print(", ")
+        } else {
+    }
+        emit_c_params(reg, rest)
+
+
+    fn flatten_fn_ret(t : Int) -> Int {
+        if m0_get(t, 0) == T_FN) {
+        flatten_fn_ret(m0_get(t, 5))
+        } else {
+        t
+
+
+    fn flatten_fn_params(t : Int, acc : Int) -> Int {
+        if m0_get(t, 0) == T_FN) {
+        let p : Int = m0_get(t, 3)
+        flatten_fn_params(m0_get(t, 5), m0_cons(m0_head(p), acc))
+        } else {
+        acc
+
+
+    fn emit_extern(reg : Int, d : Int) -> Int {
+        let cn : String = m0_load_string(d, 3)
+        let t : Int = m0_get(d, 4)
+        if m0_get(t, 0) == T_FN) {
+        let ret : Int = flatten_fn_ret(t);
+        let params : Int = rev(flatten_fn_params(t, m0_nil()));
+        emit_c_type(reg, ret);
+        m0_print(" ");
+        m0_print(cn);
+        m0_print("(");
+        emit_c_params(reg, params);return m0_print(");\n");
+        } else {
+        let p0 : Int = emit_c_type(reg, t);
+        let p1 : Int = m0_print(" ");
+        let p2 : Int = m0_print(cn);
+        m0_print(";\n")
+
+
+    fn emit_fn(reg : Int, d : Int) -> Int {
+        let nm : String = m0_load_string(d, 3)
+        let params : Int = m0_get(d, 4);
+        let ret : Int = m0_get(d, 6);
+        let body : Int = m0_get(d, 7);
+        let is_main : Int = (m0_string_eq(nm, "main") == 1)
+        if 
+        is_main {
+        let p : Int = m0_print("int");
+        } else {
+        let _s : Int = emit_c_type(reg, ret);
+    }
+        let p0 : Int = m0_print(" ")
+        let p1 : Int = m0_print(nm);
+        let p2 : Int = m0_print("(");
+        if 
+        is_main {
+        let p3 : Int = m0_print("void");
+        } else {
+        let _s : Int = emit_fn_ep(reg, params, 1);
+    }
+        let p3 : Int = m0_print(") {\n  return ")
+        let p4 : Int = emit_c_expr(reg, body);
+
+
+    fn emit_module_pass1(reg : Int, l : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        let d : Int = m0_head(l);
+        if m0_get(d, 0) == N_TYPE_DECL) {
+        let _s : Int = emit_typedef(reg, m0_get(d, 4), m0_load_string(d, 3));
+        } else {
+    }
+        emit_module_pass1(reg, m0_tail(l))
+
+
+    fn emit_module_pass2(reg : Int, l : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        let d : Int = m0_head(l)
+        if m0_get(d, 0) == N_EXTERN) {
+        let _s : Int = emit_extern(reg, d);
+        } else {
+    }
+        emit_module_pass2(reg, m0_tail(l))
+
+
+    fn emit_module_pass3(reg : Int, l : Int) -> Int {
+        if m0_is_nil(l) == 1) {
+        0
+        } else {
+        let d : Int = m0_head(l)
+        if m0_get(d, 0) == N_FN_DECL) {
+        let _s : Int = emit_fn(reg, d);
+        } else {
+    }
+        emit_module_pass3(reg, m0_tail(l))
+
+
+    fn emit_module(m : Int) -> Int {
+        let decls : Int = m0_get(m, 4)
+        let reg : Int = build_reg(decls, m0_nil());
+        let h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n\n");
+        let p1 : Int = emit_module_pass1(reg, decls);
+        let n1 : Int = m0_print("\n");
+        let p2 : Int = emit_module_pass2(reg, decls);
+        let n2 : Int = m0_print("\n");
+        let p3 : Int = emit_module_pass3(reg, decls);
+
+

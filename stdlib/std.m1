@@ -1,0 +1,19 @@
+module std;
+
+external "m0_print" : String -> Int;
+external "m0_println" : String -> Int;
+external "m0_string_len" : String -> Int;
+external "m0_string_concat" : String -> String -> String;
+external "m0_int_to_string" : Int -> String;
+external "m0_string_to_int" : String -> Int;
+external "m0_read_file" : String -> String;
+external "m0_write_file" : String -> String -> Int;
+
+do say(s : String) -> Int { m0_println(s) }
+do show(s : String) -> Int { m0_print(s) }
+do string_len(s : String) -> Int { m0_string_len(s) }
+do string_concat(a : String, b : String) -> String { m0_string_concat(a, b) }
+do int_to_string(n : Int) -> String { m0_int_to_string(n) }
+do string_to_int(s : String) -> Int { m0_string_to_int(s) }
+do read_file(path : String) -> String { m0_read_file(path) }
+do write_file(path : String, content : String) -> Int { m0_write_file(path, content) }

@@ -1,0 +1,91 @@
+module main;
+import std.string;
+
+do main() -> Int {
+    external "m0_print" : String -> Int
+    external "m0_println" : String -> Int
+    external "m0_string_len" : String -> Int
+    external "m0_string_concat" : String -> String -> String
+    external "m0_int_to_string" : Int -> String
+    external "m0_string_to_int" : String -> Int
+    external "m0_read_file" : String -> String
+    external "m0_write_file" : String -> String -> Int
+    external "m1_vector_new" : Unit -> Int
+    external "m1_vector_push" : Int -> Int -> Int
+    external "m1_vector_get" : Int -> Int -> Int
+    external "m1_vector_set" : Int -> Int -> Int -> Int
+    external "m1_vector_len" : Int -> Int
+    external "m1_vector_sort" : Int -> Int
+    external "m1_read_line" : Unit -> String
+    external "m1_read_int" : Unit -> Int
+    external "m1_char_at" : String -> Int -> Int
+    external "m1_substring" : String -> Int -> Int -> String
+    external "m1_string_split" : String -> String -> Int
+    external "m1_vector_get_str" : Int -> Int -> String
+    external "m1_map_new" : Unit -> Int
+    external "m1_map_set" : Int -> Int -> Int -> Int
+    external "m1_map_get" : Int -> Int -> Int
+    external "m1_map_has" : Int -> Int -> Int
+    external "m1_map_len" : Int -> Int
+    external "m1_matrix_new" : Int -> Int -> Int
+    external "m1_matrix_get" : Int -> Int -> Int -> Int
+    external "m1_matrix_set" : Int -> Int -> Int -> Int -> Int
+    external "m1_float_of_int" : Int -> Int
+    external "m1_float_add" : Int -> Int -> Int
+    external "m1_float_sub" : Int -> Int -> Int
+    external "m1_float_mul" : Int -> Int -> Int
+    external "m1_float_div" : Int -> Int -> Int
+    external "m1_float_lt" : Int -> Int -> Int
+    external "m1_float_gt" : Int -> Int -> Int
+    external "m1_float_eq" : Int -> Int -> Int
+    external "m1_float_to_string" : Int -> String
+    external "m1_string_to_float" : String -> Int
+    do say(s : String) -> Int { m0_println(s) }
+    do show(s : String) -> Int { m0_print(s) }
+    do string_len(s : String) -> Int { m0_string_len(s) }
+    do string_concat(a : String, b : String) -> String { m0_string_concat(a, b) }
+    do int_to_string(n : Int) -> String { m0_int_to_string(n) }
+    do string_to_int(s : String) -> Int { m0_string_to_int(s) }
+    do read_file(path : String) -> String { m0_read_file(path) }
+    do write_file(path : String, content : String) -> Int { m0_write_file(path, content) }
+    do vector_new() -> Int { m1_vector_new() }
+    do vector_push(v : Int, x : Int) -> Int { m1_vector_push(v, x) }
+    do vector_get(v : Int, i : Int) -> Int { m1_vector_get(v, i) }
+    do vector_set(v : Int, i : Int, x : Int) -> Int { m1_vector_set(v, i, x) }
+    do vector_len(v : Int) -> Int { m1_vector_len(v) }
+    do vector_sort(v : Int) -> Int { m1_vector_sort(v) }
+    do read_line() -> String { m1_read_line() }
+    do read_int() -> Int { m1_read_int() }
+    do char_at(s : String, i : Int) -> Int { m1_char_at(s, i) }
+    do substring(s : String, start : Int, len : Int) -> String { m1_substring(s, start, len) }
+    do string_split(s : String, delim : String) -> Int { m1_string_split(s, delim) }
+    do vector_get_str(v : Int, i : Int) -> String { m1_vector_get_str(v, i) }
+    do map_new() -> Int { m1_map_new() }
+    do map_set(m : Int, k : Int, v : Int) -> Int { m1_map_set(m, k, v) }
+    do map_get(m : Int, k : Int) -> Int { m1_map_get(m, k) }
+    do map_has(m : Int, k : Int) -> Int { m1_map_has(m, k) }
+    do map_len(m : Int) -> Int { m1_map_len(m) }
+    do matrix_new(rows : Int, cols : Int) -> Int { m1_matrix_new(rows, cols) }
+    do matrix_get(m : Int, r : Int, c : Int) -> Int { m1_matrix_get(m, r, c) }
+    do matrix_set(m : Int, r : Int, c : Int, v : Int) -> Int { m1_matrix_set(m, r, c, v) }
+    do float_of_int(n : Int) -> Int { m1_float_of_int(n) }
+    do float_add(a : Int, b : Int) -> Int { m1_float_add(a, b) }
+    do float_sub(a : Int, b : Int) -> Int { m1_float_sub(a, b) }
+    do float_mul(a : Int, b : Int) -> Int { m1_float_mul(a, b) }
+    do float_div(a : Int, b : Int) -> Int { m1_float_div(a, b) }
+    do float_lt(a : Int, b : Int) -> Int { m1_float_lt(a, b) }
+    do float_gt(a : Int, b : Int) -> Int { m1_float_gt(a, b) }
+    do float_eq(a : Int, b : Int) -> Int { m1_float_eq(a, b) }
+    do float_to_string(f : Int) -> String { m1_float_to_string(f) }
+    do string_to_float(s : String) -> Int { m1_string_to_float(s) }
+
+    say(int_to_string(std.string.length(std.string.concat("hello", " world"))));
+    say(int_to_string(std.string.equals("hello world", std.string.concat("hello", " world"))));
+    say(int_to_string(std.string.starts_with(std.string.concat("hello", " world"), "hello")));
+    say(int_to_string(std.string.ends_with(std.string.concat("hello", " world"), "world")));
+    say(int_to_string(std.string.contains(std.string.concat("hello", " world"), "lo w")));
+    say(int_to_string(std.string.contains(std.string.concat("hello", " world"), "xyz")));
+    say(int_to_string(std.string.to_int("42")));
+    say(std.string.from_int(99));
+    0
+}

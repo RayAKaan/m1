@@ -1,0 +1,9 @@
+world ConnectionTest {
+    do main() -> Int {
+        set live conn : Int = 0;
+        conn = 1;
+        freeze conn;
+        say(int_to_string(was conn.1));
+        0
+    }
+}

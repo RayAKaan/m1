@@ -1,0 +1,36 @@
+module TestM1C2 {
+    external "m0_print" : String -> Int
+    external "m0_int_to_string" : Int -> String
+    external "m0_string_eq" : String -> String -> Int
+    external "m0_get_env" : String -> String
+    external "m0_read_file" : String -> String
+    external "m1_lexer_init" : String -> M1Lexer
+    external "m1_lexer_next" : M1Lexer -> M1LexResult
+    type M1Token = { kind : Int, line : Int, col : Int, int_val : Int, str_val : String }
+    type M1Lexer = { src : String, pos : Int, line : Int, col : Int }
+    type M1LexResult = { token : M1Token, lexer : M1Lexer }
+    type PS = { tk : M1Token, lx : M1Lexer, err : Int }
+    type PR = { node : Int, st : PS }
+    fn parse_program(s : PS) -> PR {
+        { node = 0, st = s }
+    }
+    fn emit_module(m : Int) -> Int {
+        m0_print("module emitted\n");
+        0
+    }
+    fn main() -> Int {
+        let filename : String = m0_get_env("M1_SOURCE");
+        if m0_string_eq(filename, "") == 1 {
+            m0_print("[M1000] error: no source file\n");
+            1
+        } else {
+            let src : String = m0_read_file(filename);
+            let l : M1Lexer = m1_lexer_init(src);
+            let r : M1LexResult = m1_lexer_next(l);
+            let s : PS = { tk = r.token, lx = r.lexer, err = 0 };
+            let pr : PR = parse_program(s);
+            let _em : Int = emit_module(42);
+            pr.st.err
+        }
+    }
+}

@@ -1,0 +1,13 @@
+module TestMod {
+    external "m0_print" : String -> Int
+    do greet(name : String) -> Int {
+        m0_print("Hello, ");
+        m0_print(name);
+        m0_print("!\n");
+        0
+    }
+    do main() -> Int {
+        greet("world");
+        0
+    }
+}

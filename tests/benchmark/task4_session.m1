@@ -1,0 +1,19 @@
+world SessionTest {
+    do main() -> Int {
+        set Guest : Int = 0;
+        set Authenticated : Int = 1;
+        set Admin : Int = 2;
+
+        set live session : Int = Guest;
+        set _ : Int = now session >= 0;
+        set _ : Int = say(int_to_string(was session.Guest));
+        set _ : Int = session = Authenticated;
+        set _ : Int = say(int_to_string(was session.Authenticated));
+        set _ : Int = when session == Admin then { say("admin activated") };
+        set _ : Int = session = Admin;
+        set _ : Int = say(int_to_string(was session.Admin));
+        set _ : Int = freeze session;
+        set _ : Int = say(int_to_string(was session.live));
+        0
+    }
+}

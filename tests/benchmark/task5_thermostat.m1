@@ -1,0 +1,13 @@
+world ThermostatTest {
+    do main() -> Int {
+        set live temp : Int = 22;
+        set _ : Int = now temp >= 15;
+        set _ : Int = when temp > 30 then { say("cooling") };
+        set _ : Int = when temp < 15 then { say("heating") };
+        set _ : Int = temp = 18;
+        set _ : Int = temp = 32;
+        set _ : Int = temp = 10;
+        set _ : Int = say(int_to_string(temp));
+        0
+    }
+}

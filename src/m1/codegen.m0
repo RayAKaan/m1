@@ -1,0 +1,37 @@
+module M1Codegen {
+    external "m0_print" : String -> Int
+    external "m0_alloc" : Int -> Int
+    external "m0_set" : Int -> Int -> Int -> Int
+    external "m0_get" : Int -> Int -> Int
+    external "m0_store_string" : Int -> Int -> String -> Int
+    external "m0_load_string" : Int -> Int -> String
+
+    fn store_line(text : String) -> Int {
+        let n : Int = m0_alloc(1);
+        let s : Int = m0_store_string(n, 0, text);
+        let p : Int = m0_print(m0_load_string(n, 0));
+        p
+    }
+
+    fn main() -> Int {
+        let n : Int = m0_alloc(2);
+        let s0 : Int = m0_set(n, 0, 3);
+        let s1 : Int = m0_set(n, 1, 7);
+        let keep : Int = m0_get(n, 0) + m0_get(n, 1);
+        let l01 : Int = store_line("#include <stdint.h>\n");
+        let l02 : Int = store_line("\n");
+        let l03 : Int = store_line("typedef struct { int64_t first; int64_t second; } Pair;\n");
+        let l04 : Int = store_line("\n");
+        let l05 : Int = store_line("\n");
+        let l06 : Int = store_line("int64_t add(int64_t a, int64_t b) {\n");
+        let l07 : Int = store_line("  return (a + b);\n");
+        let l08 : Int = store_line("}\n");
+        let l09 : Int = store_line("Pair make_pair(int64_t a, int64_t b) {\n");
+        let l10 : Int = store_line("  return (Pair){ .first = a, .second = b };\n");
+        let l11 : Int = store_line("}\n");
+        let l12 : Int = store_line("int main(void) {\n");
+        let l13 : Int = store_line("  return make_pair(3, 7).first;\n");
+        let l14 : Int = store_line("}\n");
+        0
+    }
+}

@@ -1,0 +1,249 @@
+module M1Ast {
+
+    -- Source location
+    type SrcLoc = { file : String, line : Int, col : Int }
+
+    -- String view (non-owning pointer + length)
+    type StringView = { data : String, len : Int }
+
+    -- Effect labels
+    type EffectAtom = | EffRead(String, String)
+                     | EffWrite(String, String)
+                     | EffAlloc(String)
+                     | EffFree(String)
+                     | EffTime(String)
+                     | EffNet(String, String)
+                     | EffIO
+
+    type EffectLabel = { atoms : List, count : Int }
+
+    -- Linear type modalities
+    type Linearity = | LinLinear
+                    | LinAffine
+                    | LinPersistent
+
+    -- Type expressions (M1 full)
+    type TypeKind = | TyInt
+                   | TyFloat
+                   | TyString
+                   | TyChar
+                   | TyBool
+                   | TyUnit
+                   | TyNamed
+                   | TyVar
+                   | TyPi
+                   | TySigma
+                   | TyFn
+                   | TyRecord
+                   | TySum
+                   | TyApp
+                   | TyLinear
+                   | TyEffect
+                   | TyEventual
+                   | TyError
+
+    type TypeField = { name : StringView, ty : M1Type }
+
+    type TypeCtor = { name : StringView, arg : M1Type }
+
+    type M1Type = {
+        kind : TypeKind,
+        loc : SrcLoc,
+        name : StringView,
+        param_name : StringView,
+        param_type : M1Type,
+        body_type : M1Type,
+        fn_params : List,
+        fn_count : Int,
+        fn_ret : M1Type,
+        rec_fields : List,
+        rec_count : Int,
+        sum_ctors : List,
+        sum_count : Int,
+        app_base : M1Type,
+        app_args : List,
+        app_count : Int,
+        linear_inner : M1Type,
+        linear_mod : Linearity,
+        effect_inner : M1Type,
+        effect_label : EffectLabel,
+        eventual_val : M1Type,
+        eventual_err : M1Type
+    }
+
+    -- Patterns (M1 full)
+    type PatternKind = | PatWildcard
+                      | PatLiteral
+                      | PatConstructor
+                      | PatRecord
+                      | PatName
+                      | PatOr
+                      | PatGuard
+
+    type FieldPat = { name : StringView, pat : M1Pattern }
+
+    type M1Pattern = {
+        kind : PatternKind,
+        loc : SrcLoc,
+        lit_val : M1Expr,
+        ctor_name : StringView,
+        ctor_arg : M1Pattern,
+        rec_fields : List,
+        rec_count : Int,
+        var_name : StringView,
+        or_left : M1Pattern,
+        or_right : M1Pattern,
+        guard_pat : M1Pattern,
+        guard_cond : M1Expr
+    }
+
+    -- Expression kinds (M1 full)
+    type ExprKind = | ExInt
+                   | ExFloat
+                   | ExString
+                   | ExChar
+                   | ExBool
+                   | ExUnit
+                   | ExName
+                   | ExBinary
+                   | ExNot
+                   | ExFieldAccess
+                   | ExCall
+                   | ExAnnot
+                   | ExLet
+                   | ExLambda
+                   | ExMatch
+                   | ExIf
+                   | ExRecord
+                   | ExList
+                   | ExGroup
+                   | ExQuantForall
+                   | ExQuantExists
+                   | ExEffectLabel
+
+    type BinaryOp = | OpAdd
+                   | OpSub
+                   | OpMul
+                   | OpDiv
+                   | OpMod
+                   | OpEq
+                   | OpNeq
+                   | OpLt
+                   | OpGt
+                   | OpLe
+                   | OpGe
+                   | OpAnd
+                   | OpOr
+                   | OpImpl
+                   | OpIff
+
+    type Param = { name : StringView, ty : M1Type }
+
+    type FieldInit = { name : StringView, value : M1Expr }
+
+    type MatchArm = { pattern : M1Pattern, body : M1Expr, guard : M1Expr }
+
+    type M1Expr = {
+        kind : ExprKind,
+        loc : SrcLoc,
+        ty : M1Type,
+        effect : EffectLabel,
+        int_val : Int,
+        float_val : Int,
+        str_val : StringView,
+        char_val : Int,
+        bool_val : Int,
+        name_val : StringView,
+        bin_op : BinaryOp,
+        bin_left : M1Expr,
+        bin_right : M1Expr,
+        not_expr : M1Expr,
+        field_expr : M1Expr,
+        field_name : StringView,
+        call_expr : M1Expr,
+        call_args : List,
+        call_count : Int,
+        annot_expr : M1Expr,
+        annot_type : M1Type,
+        let_name : StringView,
+        let_type : M1Type,
+        let_value : M1Expr,
+        let_body : M1Expr,
+        lam_params : List,
+        lam_count : Int,
+        lam_ret : M1Type,
+        lam_body : M1Expr,
+        match_scrut : M1Expr,
+        match_arms : List,
+        match_count : Int,
+        if_cond : M1Expr,
+        if_then : M1Expr,
+        if_else : M1Expr,
+        rec_fields : List,
+        rec_count : Int,
+        list_elems : List,
+        list_count : Int,
+        group_expr : M1Expr,
+        quant_var : StringView,
+        quant_type : M1Type,
+        quant_body : M1Expr,
+        eff_label : EffectLabel,
+        eff_inner : M1Expr
+    }
+
+    -- Constraints (M1)
+    type ConstraintKind = | CkInvariant
+                        | CkAlways
+                        | CkNever
+                        | CkPhysical
+
+    type M1Constraint = {
+        kind : ConstraintKind,
+        loc : SrcLoc,
+        name : StringView,
+        body : M1Expr,
+        scope : StringView
+    }
+
+    -- Declarations (M1 full)
+    type DeclKind = | DeclType
+                   | DeclProp
+                   | DeclFn
+                   | DeclExtern
+                   | DeclConstraint
+
+    type PropForm = | FormDerivation
+                   | FormBidirectional
+                   | FormSignature
+
+    type M1Decl = {
+        kind : DeclKind,
+        loc : SrcLoc,
+        type_name : StringView,
+        type_body : M1Type,
+        prop_name : StringView,
+        prop_type : M1Type,
+        prop_body : M1Expr,
+        prop_form : PropForm,
+        fn_name : StringView,
+        fn_params : List,
+        fn_count : Int,
+        fn_ret : M1Type,
+        fn_body : M1Expr,
+        ext_cname : StringView,
+        ext_type : M1Type,
+        constraint : M1Constraint
+    }
+
+    -- Module and Program
+    type M1Module = {
+        name : StringView,
+        decls : List,
+        count : Int
+    }
+
+    type M1Program = {
+        modules : List,
+        count : Int
+    }
+}

@@ -1,0 +1,4 @@
+module TestType { external "m0_print" : String -> Int
+ type MyType = { x : Int, y : Int }
+ fn greet(n : String) -> Int { m0_print(n); 0 }
+ fn main() -> Int { greet("x"); 0 } }

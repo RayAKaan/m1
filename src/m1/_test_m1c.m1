@@ -1,0 +1,13 @@
+module TestM1C {
+    external "phase_graph_init" : () -> Int
+    external "phase_graph_query" : String -> String -> Int
+    external "m0_print" : String -> Int
+    external "m0_get" : Int -> Int -> Int
+    external "m0_nil" : Int
+    let TK_EOF : Int = 0
+    let TK_INT : Int = 1
+    do main() -> Int {
+        m0_print("hello");
+        0
+    }
+}

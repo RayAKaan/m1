@@ -1,0 +1,39 @@
+module ListTest {
+    external "m0_cons" : Int -> Int -> Int
+    external "m0_nil" : Int -> Int
+    external "m0_head" : Int -> Int
+    external "m0_tail" : Int -> Int
+    external "m0_is_nil" : Int -> Int
+    external "m0_list_length" : Int -> Int
+    external "m0_alloc" : Int -> Int
+    external "m0_set" : Int -> Int -> Int -> Int
+    external "m0_get" : Int -> Int -> Int
+    external "m0_print" : String -> Int
+    external "m0_print_int" : Int -> Int
+
+    fn build(n : Int) -> Int {
+        if n <= 0 { m0_nil(0) }
+        else { m0_cons(n, build(n - 1)) }
+    }
+
+    fn sum(list : Int) -> Int {
+        if m0_is_nil(list) == 1 { 0 }
+        else { m0_head(list) + sum(m0_tail(list)) }
+    }
+
+    fn test_node() -> Int {
+        let n : Int = m0_alloc(3);
+        let s0 : Int = m0_set(n, 0, 10);
+        let s1 : Int = m0_set(n, 1, 20);
+        let s2 : Int = m0_set(n, 2, 30);
+        m0_get(n, 0) + m0_get(n, 1) + m0_get(n, 2)
+    }
+
+    fn main() -> Int {
+        let l : Int = build(10);
+        let s : Int = sum(l);
+        let len : Int = m0_list_length(l);
+        let n : Int = test_node();
+        s + len + n
+    }
+}

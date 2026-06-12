@@ -1,0 +1,46 @@
+module Test {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_print" : String -> Int
+
+    type M1Tk = | TkEof | TkIdent | TkLParen | TkRParen
+
+    type M1Token = {
+        kind : M1Tk,
+        line : Int,
+        col : Int,
+        int_val : Int,
+        str_val : String
+    }
+
+    type M1Lexer = {
+        src : String,
+        pos : Int,
+        line : Int,
+        col : Int
+    }
+
+    type M1LexResult = {
+        token : M1Token,
+        lexer : M1Lexer
+    }
+
+    fn mk_tok(k : M1Tk, line : Int, col : Int) -> M1Token {
+        { kind = k, line = line, col = col, int_val = 0, str_val = "" }
+    }
+
+    fn peek(l : M1Lexer) -> Int {
+        m0_char_at(l.src, l.pos)
+    }
+
+    fn advance(l : M1Lexer) -> M1Lexer {
+        { src = l.src, pos = l.pos + 1, line = l.line, col = l.col + 1 }
+    }
+
+    fn m1_lexer_next(l : M1Lexer) -> M1LexResult {
+        let c : Int = peek(l);
+        if c == 40 { { token = mk_tok(TkLParen, 0, 0), lexer = advance(l) } } else {
+        if c == 41 { { token = mk_tok(TkRParen, 0, 0), lexer = advance(l) } } else {
+        { token = mk_tok(TkEof, 0, 0), lexer = l }
+        }}
+    }
+}

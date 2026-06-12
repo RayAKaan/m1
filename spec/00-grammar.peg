@@ -1,0 +1,450 @@
+// ============================================================================
+// PEG Grammar — [Unnamed Language]
+// Version: 0.1 (Formal Specification)
+//
+// Conventions:
+//   _       = whitespace/comments (implicit between tokens in terminals)
+//   Rules use '='
+//   Literals use ''
+//   PEG standard: / for ordered choice, () for grouping, ?, *, +
+//   Comments use //
+//
+// M₀ subset markings:
+//   # M₀: yes — this production is in the bootstrap subset
+//   # M₀: no  — this production waits for self-hosted compiler
+//   # M₀: partial — partially available in M₀
+// ============================================================================
+
+// ============================================================================
+// TOP-LEVEL STRUCTURE
+// ============================================================================
+
+Program        = Module* EOF                                                    # M₀: yes
+
+Module         = 'module' _ Name _ '{' _ Declaration* _ '}' _                   # M₀: yes
+
+EOF            = !.                                                             # M₀: yes
+
+// ============================================================================
+// DECLARATIONS
+// ============================================================================
+
+Declaration    = TypeDecl / PropDecl / FnDecl / ExternDecl / ConstraintDecl     # M₀: yes
+
+// --- Type Declarations ---
+
+TypeDecl       = 'type' _ Name _ '=' _ TypeExpr _                               # M₀: yes
+
+TypeExpr       = Expr                  // types ARE expressions; the type        # M₀: yes
+                                      // checker distinguishes type contexts
+                                      // from term contexts semantically.
+
+// --- Proposition Declarations ---
+
+PropDecl       = Name _ ':' _ TypeExpr _ '<-' _ Expr _                         # M₀: partial
+               // Derivation: "name : T <- body"
+               // name IS OF type T, defined AS body (directional)
+
+               / Name _ ':' _ TypeExpr _ '<->' _ Expr _                        # M₀: no
+               // Bidirectional: "name : T <-> body"
+               // name IS EQUIVALENT TO body (logical equivalence, rewrite rule)
+
+               / Name _ ':' _ TypeExpr _                                        # M₀: yes
+               // Signature only: "name : T"
+               // Declares a name with a type but no body.
+               // Used for axioms, external declarations, abstract types.
+
+// --- Function Declarations ---
+
+FnDecl         = 'fn' _ Name _ '(' _ ParamList? _ ')' _ '->' _ TypeExpr _ Block # M₀: yes
+               // Syntactic sugar for:
+               //   name : (params) -> RetType <- fn(params) -> RetType { body }
+
+// --- External / FFI Declarations ---
+
+ExternDecl     = 'external' _ StringLiteral _ ':' _ TypeExpr                  # M₀: yes
+               // Declares an external (C) function with the given type.
+               // StringLiteral is the C symbol name.
+               // Used in M₀ bootstrap to call LLVM-C API.
+               // In M₁+, External is handled via the effect system.
+
+// --- Constraint Declarations ---
+
+ConstraintDecl = InvariantDecl                                                 # M₀: no
+               / AlwaysDecl                                                    # M₀: no
+               / NeverDecl                                                     # M₀: no
+               / PhysicalConstraintDecl                                        # M₀: no
+
+InvariantDecl       = '@invariant' _ Expr _                                    # M₀: no
+AlwaysDecl          = '@always' _ Expr _                                       # M₀: no
+NeverDecl           = '@never' _ Expr _                                        # M₀: no
+PhysicalConstraintDecl = '@physical_constraint' _ Expr _                       # M₀: no
+
+// ============================================================================
+// EXPRESSIONS — Core Language
+//
+// Expressions ARE propositions. A value IS a proof.
+// There is no statement/expression split. Everything returns a value.
+// ============================================================================
+//
+// Precedence (highest to lowest):
+//   1. Postfix: .field, (args), :Type
+//   2. Unary prefix: not, [Effect]
+//   3. Multiplicative: * / %
+//   4. Additive: + -
+//   5. Comparison: == != < > <= >=
+//   6. Conjunction: /\
+//   7. Disjunction: \/
+//   8. Implication: -> (right-assoc)
+//   9. Iff: <-> (right-assoc)
+// ============================================================================
+
+Expr           = IffExpr                                                       # M₀: yes
+
+IffExpr        = ImplExpr ( _ '<->' _ ImplExpr )*                              # M₀: partial
+
+ImplExpr       = DisjExpr ( _ '->' _ ImplExpr )?                               # M₀: yes
+               // Right-associative: P -> Q -> R  =  P -> (Q -> R)
+
+DisjExpr       = ConjExpr ( _ '\/' _ DisjExpr )?                               # M₀: yes
+
+ConjExpr       = CmpExpr ( _ '/\' _ ConjExpr )?                                # M₀: yes
+
+CmpExpr        = AddExpr ( _ CmpOp _ AddExpr )?                                # M₀: yes
+
+CmpOp          = '==' / '!=' / '<=' / '>=' / '<' / '>'                         # M₀: yes
+
+AddExpr        = MulExpr ( _ AddOp _ AddExpr )?                                # M₀: yes
+
+AddOp          = '+' / '-'                                                      # M₀: yes
+
+MulExpr        = PreExpr ( _ MulOp _ MulExpr )?                                # M₀: yes
+
+MulOp          = '*' / '/' / '%'                                                # M₀: yes
+
+PreExpr        = NotExpr / EffExpr / PostExpr                                  # M₀: yes
+
+NotExpr        = 'not' _ PreExpr                                               # M₀: yes
+
+EffExpr        = EffectLabel _ PreExpr                                         # M₀: no
+               // Effect annotation on an expression
+
+// --- Postfix Expressions ---
+
+PostExpr       = AtomExpr ( _ PostfixOp )*                                     # M₀: yes
+
+PostfixOp      = FieldOp / ApplyOp / AnnotOp                                   # M₀: yes
+
+FieldOp        = '.' _ Name                                                    # M₀: yes
+
+ApplyOp        = '(' _ ExprList? _ ')'                                         # M₀: yes
+               // Application covers:
+               //   - function application: f(x)
+               //   - type constructor: Some(x)
+               //   - type application: List(T, n)
+
+AnnotOp        = ':' _ Expr                                                    # M₀: yes
+               // Type ascription: expr : Type
+
+// ============================================================================
+// ATOMIC EXPRESSIONS
+// ============================================================================
+
+AtomExpr       = LiteralExpr                                                   # M₀: yes
+               / NameExpr                                                      # M₀: yes
+               / QuantExpr                                                     # M₀: no
+               / MatchExpr                                                     # M₀: yes
+               / LetExpr                                                       # M₀: yes
+               / LambdaExpr                                                    # M₀: yes
+               / RecordExpr                                                    # M₀: yes
+               / ListExpr                                                      # M₀: yes
+               / GroupExpr                                                     # M₀: yes
+               // Note: No SumConstructor rule.
+               // Constructor application (Some(x)) parses as
+               // NameExpr + ApplyOp: same syntax as function application.
+               // Constructors ARE functions in this language.
+
+// --- Names ---
+
+NameExpr       = Name                                                           # M₀: yes
+
+Name           = IdentStart IdentCont*                                          # M₀: yes
+
+IdentStart     = [a-zA-Z_]                                                     # M₀: yes
+IdentCont      = [a-zA-Z0-9_']                                                 # M₀: yes
+               // ' (prime) allowed in identifiers for x', result', etc.
+
+// --- Literals ---
+
+LiteralExpr    = IntLiteral / FloatLiteral / StringLiteral                     # M₀: yes
+               / CharLiteral / BoolLiteral / UnitLiteral
+
+IntLiteral     = Digit+                                                        # M₀: yes
+
+FloatLiteral   = Digit+ '.' Digit+ ( ('e' / 'E') ('+' / '-')? Digit+ )?       # M₀: yes
+
+StringLiteral  = '"' ( Escape / StrChar )* '"'                                 # M₀: yes
+
+CharLiteral    = '\'' ( Escape / CharChar ) '\''                               # M₀: yes
+
+BoolLiteral    = 'true' / 'false'                                              # M₀: yes
+
+UnitLiteral    = '{' _ '}'                                                     # M₀: yes
+               // Empty record = Unit value
+
+Digit          = [0-9]                                                         # M₀: yes
+
+StrChar        = !['"\] .                                                      # M₀: yes
+CharChar       = !['\] .                                                       # M₀: yes
+Escape         = '\' ( 'n' / 't' / 'r' / '0' / '\' / '"' / '\''                # M₀: yes
+                      / 'x' HexDigit HexDigit
+                      / 'u' HexDigit HexDigit HexDigit HexDigit )
+
+HexDigit       = [0-9a-fA-F]                                                   # M₀: yes
+
+// --- Quantified Expressions ---
+
+QuantExpr      = ForallExpr / ExistsExpr                                       # M₀: no
+
+ForallExpr     = 'forall' _ Name _ ':' _ Expr _ '->' _ Expr                    # M₀: no
+               // forall x : Type -> Proposition
+               // Body extends as far right as possible
+
+ExistsExpr     = 'exists' _ Name _ ':' _ Expr _ '/\' _ Expr                    # M₀: no
+               // exists x : Type /\ Proposition
+               // Body extends as far right as possible
+
+// --- Match / Case Analysis ---
+
+MatchExpr      = 'match' _ Expr _ '{' _ MatchArm+ _ '}'                        # M₀: yes
+               // Note: 'if' is sugar for match on Bool:
+               //   if cond then a else b
+               //     → match cond { true -> a; false -> b }
+
+MatchArm       = Pattern _ '->' _ Expr _ ';'? _                                # M₀: yes
+               // Semicolons optional between arms, acts as separator
+
+// --- Patterns ---
+
+Pattern        = OrPattern                                                     # M₀: yes
+
+OrPattern      = PrimaryPattern ( _ '|' _ PrimaryPattern )*                    # M₀: yes
+
+PrimaryPattern = WildcardPattern                                               # M₀: yes
+               / LiteralPattern                                                # M₀: yes
+               / ConstructorPattern                                            # M₀: yes
+               / RecordPattern                                                 # M₀: yes
+               / NamePattern                                                   # M₀: yes
+
+WildcardPattern     = '_'                                                      # M₀: yes
+
+LiteralPattern      = LiteralExpr                                              # M₀: yes
+
+ConstructorPattern  = Name _ '(' _ Pattern _ ')'                               # M₀: yes
+                     // Constructor with argument: Some(x), Left(e)
+
+RecordPattern       = '{' _ PatternFieldList? _ '}'                            # M₀: yes
+
+PatternFieldList    = PatternField ( _ ',' _ PatternField )* _ ','?             # M₀: yes
+
+PatternField        = Name _ ':' _ Pattern                                     # M₀: yes
+                    / Name                                                     # M₀: yes
+                    // Shorthand: bare name = field name is binding name
+
+NamePattern         = Name                                                      # M₀: yes
+                     // Variable binding. Matches anything, binds to name.
+                     // Type checker distinguishes variable from constructor
+                     // based on whether there's a matching constructor.
+                     // (This must come after ConstructorPattern in ordered
+                     //  choice so that `Name(` is tried first.)
+
+// --- Let Bindings ---
+
+LetExpr        = 'let' _ Name _ ':' _ Expr _ '=' _ Expr _ ';' _ Expr          # M₀: yes
+               // let name : Type = value; body
+               // The bound name is available in body
+               // Type annotation is required (relaxed in M₁ with inference)
+
+// --- Lambda / Function Abstraction ---
+
+LambdaExpr     = 'fn' _ '(' _ ParamList? _ ')' _ '->' _ Expr _ Block          # M₀: yes
+               // fn(params) -> ReturnType { body }
+               // Lambda abstraction = proof of forall
+               // Return type is required (relaxed in M₁ with inference)
+
+Block          = '{' _ BodyExpr _ '}'                                          # M₀: yes
+
+BodyExpr       = Expr                                                          # M₀: yes
+               // The body of a lambda is a single expression.
+               // Semicolons at end are part of the expression (let syntax).
+
+// --- Parameters ---
+
+ParamList      = Param ( _ ',' _ Param )*                                      # M₀: yes
+
+Param          = Name _ ':' _ Expr                                             # M₀: yes
+
+// --- Record Construction ---
+
+RecordExpr     = '{' _ FieldInitList _ '}'                                     # M₀: yes
+
+FieldInitList  = FieldInit ( _ ',' _ FieldInit )* _ ','?                       # M₀: yes
+
+FieldInit      = Name _ '=' _ Expr                                             # M₀: yes
+
+// --- List Literal ---
+
+ListExpr       = '[' _ ExprList? _ ']'                                         # M₀: yes
+
+// --- Grouped Expression ---
+
+GroupExpr      = '(' _ Expr _ ')'                                              # M₀: yes
+
+// --- Expression Lists (for function application, list literals) ---
+
+ExprList       = Expr ( _ ',' _ Expr )*                                        # M₀: yes
+
+// ============================================================================
+// EFFECT LABELS
+// ============================================================================
+// M₀: no — effect labels are a full-language feature
+
+EffectLabel    = '[' _ EffectInner _ ']'                                       # M₀: no
+
+EffectInner    = EffectName ( _ EffectArg )*                                   # M₀: no
+
+EffectName     = UpperName                                                     # M₀: no
+               // By convention, effects start with uppercase: IO, Read, Write
+
+EffectArg      = Name / StringLiteral                                          # M₀: no
+               // Args describe the resource: Read FS "data.txt"
+
+// ============================================================================
+// TYPE DECLARATIONS — Right-Hand Side
+// ============================================================================
+//
+// Types ARE expressions. The RHS of a type declaration uses Expr.
+// However, certain forms are particularly common in type position:
+//
+//   RecordType  = '{' _ FieldTypeList _ '}'
+//   SumType     = '|' _ VariantType ( _ '|' _ VariantType )*
+//   FunType     = ArgType '->' RetType
+//   ApplType    = Name(Arg, ...)
+//
+// These are not separate grammar rules — they fall out of the Expr grammar
+// naturally. For example:
+//
+//   type Money = { amount: Float, currency: Currency }
+//     → parses as RecordExpr via the Expr grammar
+//
+//   type Optional(T) = | Some(T) | None
+//     → Note: sum type declarations use leading | for each variant.
+//       The outer '|' before first variant is required.
+//       This is NOT in the expression grammar — it's sugar for TypeDecl.
+//       Actual desugaring: type Optional(T) = Sum(Some(T), None)
+
+// ============================================================================
+// PATTERN MATCHING — COMMON CONSTRUCTORS
+// ============================================================================
+//
+// For sum types, the compiler generates constructor functions.
+// Given:   type Optional(T) = | Some(T) | None
+// The constructors Some and None are automatically available:
+//   Some(x) : Optional(T)      — named application syntax
+//   None    : Optional(T)      — just a name
+//
+// Matching:
+//   match opt {
+//     Some(x) -> x
+//     None    -> default
+//   }
+
+// ============================================================================
+// OPERATOR SUMMARY
+// ============================================================================
+//
+// Logical operators:
+//   not P        — logical negation (prefix)
+//   P /\ Q       — logical conjunction (and)
+//   P \/ Q       — logical disjunction (or)
+//   P -> Q       — implication (right-associative)
+//   P <-> Q      — logical equivalence (iff)
+//
+//   forall x : T -> P   — universal quantification
+//   exists x : T /\ P   — existential quantification
+//
+// Arithmetic operators:
+//   x + y        — addition
+//   x - y        — subtraction
+//   x * y        — multiplication
+//   x / y        — division
+//   x % y        — modulo
+//
+// Comparison operators:
+//   x == y       — equality
+//   x != y       — inequality
+//   x < y        — less than
+//   x > y        — greater than
+//   x <= y       — less than or equal
+//   x >= y       — greater than or equal
+//
+// Other:
+//   x.field      — record field access
+//   f(x, y)      — application
+//   expr : Type  — type ascription
+//   [Effect] T   — effect label on type/expression
+//   let x : T = v; body  — local binding
+//   fn(p: T) -> U { body }  — function abstraction
+//   { f = v, ... } — record construction
+//   [a, b, c]    — list literal
+//   match expr { p -> e; ... }  — case analysis
+
+// ============================================================================
+// WHITESPACE AND COMMENTS
+// ============================================================================
+//
+// _ is consumed between all tokens. PEG implementations typically handle this
+// implicitly. The convention is:
+//   - Whitespace and comments are skipped between any two tokens
+//   - Tokens are: keywords, literals, names, operators, punctuation
+//   - The _ rule is used explicitly in this grammar for clarity
+
+_               = ( Whitespace / LineComment / BlockComment )*                 # M₀: yes
+
+Whitespace      = [ \t\n\r]                                                    # M₀: yes
+
+LineComment     = '--' ( !'\n' . )* '\n'                                       # M₀: yes
+
+BlockComment    = '{-' ( BlockComment / ( !'-}' . ) )* '-}'                    # M₀: yes
+
+// ============================================================================
+// M₀ SUBSET — SUMMARY
+// ============================================================================
+//
+// M₀ includes:
+//   - All literal types and expressions
+//   - Let bindings, lambdas, match expressions
+//   - Record construction and field access
+//   - List literals
+//   - Arithmetic, comparison, logical operators (not, /\, \/, ->)
+//   - Type declarations (simple records, simple sum types with | syntax)
+//   - Proposition declarations with <- (derivation) and signature-only
+//   - Full function declarations
+//   - Type ascription
+//
+// M₀ excludes (planned for M₁ / self-hosted compiler):
+//   - Bidirectional declarations (<->)
+//   - Quantifiers (forall, exists)
+//   - Effect labels ([IO], etc.)
+//   - Constraints (@invariant, @always, @never, @physical_constraint)
+//   - Iff operator (<->) in expressions
+//   - Dependent types in full generality (basic type params allowed)
+//   - Linear/Affine/Persistent type annotations
+//   - Eventual<T, E>
+//
+// The M₀ compiler still parses and rejects these with clear error messages.
+// It understands the syntax but doesn't implement the semantics.
+//
+// ============================================================================
+// END OF GRAMMAR
+// ============================================================================

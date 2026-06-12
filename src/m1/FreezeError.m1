@@ -1,0 +1,8 @@
+world FreezeError {
+    do main() -> Int {
+        set live x : Int = 10;
+        freeze x;
+        set _ : Int = x = 20;
+        0
+    }
+}

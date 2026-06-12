@@ -1,0 +1,1 @@
+<unknown>:81:25: error: cannot assign to 'x', frozen at line 80

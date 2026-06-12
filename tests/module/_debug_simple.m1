@@ -1,0 +1,5 @@
+module main;
+
+do main() -> Int {
+    42
+}

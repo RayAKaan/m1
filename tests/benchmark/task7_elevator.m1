@@ -1,0 +1,17 @@
+world ElevatorTest {
+    do main() -> Int {
+        set Closed : Int = 0;
+        set Open : Int = 1;
+
+        set live doors : Int = Closed;
+        set live floor : Int = 1;
+        set _ : Int = now floor >= 1;
+        set _ : Int = now floor <= 20;
+        set _ : Int = when doors == Open then { say("doors open") };
+        set _ : Int = floor = 5;
+        set _ : Int = doors = Open;
+        set _ : Int = say(int_to_string(was doors.Open));
+        set _ : Int = say(int_to_string(floor));
+        0
+    }
+}

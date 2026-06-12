@@ -1,0 +1,14 @@
+module Test {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_substr" : String -> Int -> Int -> String
+    external "m0_string_eq" : String -> String -> Int
+    external "m0_string_len" : String -> Int
+    external "m0_print" : String -> Int
+    external "m0_print_int" : Int -> Int
+
+    fn hello() -> Int {
+        m0_print("hello\n42")
+    }
+
+    fn main() -> Int { hello() }
+}

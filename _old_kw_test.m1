@@ -1,0 +1,7 @@
+module Old {
+    fn main() -> Int {
+        let x : Int = 42;
+        println("hello");
+        0
+    }
+}

@@ -1,0 +1,3 @@
+module TestDo { external "m0_print" : String -> Int
+ do greet(n : String) -> Int { m0_print(n); 0 }
+ do main() -> Int { greet("x"); 0 } }

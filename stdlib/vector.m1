@@ -1,0 +1,118 @@
+module std.vector;
+
+external "m0_vector_new"    : Unit -> Vector;
+external "m0_vector_push"   : Vector -> Int -> Int;
+external "m0_vector_get"    : Vector -> Int -> Int;
+external "m0_vector_set"    : Vector -> Int -> Int -> Int;
+external "m0_vector_length" : Vector -> Int;
+external "m0_vector_remove" : Vector -> Int -> Int;
+external "m0_int_to_string" : Int -> String;
+external "m0_string_concat" : String -> String -> String;
+
+do new() -> Vector {
+    m0_vector_new()
+}
+
+do push(v : Vector, val : Int) -> Int {
+    m0_vector_push(v, val)
+}
+
+do get(v : Vector, idx : Int) -> Int {
+    m0_vector_get(v, idx)
+}
+
+do set(v : Vector, idx : Int, val : Int) -> Int {
+    m0_vector_set(v, idx, val)
+}
+
+do length(v : Vector) -> Int {
+    m0_vector_length(v)
+}
+
+do contains(v : Vector, val : Int) -> Int {
+    let live n : Int = length(v);
+    let live i : Int = 0;
+    let live found : Int = 0;
+    while i < n {
+        if get(v, i) == val { found = 1 };
+        if found { break };
+        i = i + 1;
+    };
+    found
+}
+
+do index_of(v : Vector, val : Int) -> Int {
+    let live n : Int = length(v);
+    let live i : Int = 0;
+    while i < n {
+        if get(v, i) == val { return i; };
+        i = i + 1;
+    };
+    -1
+}
+
+do sum(v : Vector) -> Int {
+    let live n : Int = length(v);
+    let live total : Int = 0;
+    let live i : Int = 0;
+    while i < n {
+        total = total + get(v, i);
+        i = i + 1;
+    };
+    total
+}
+
+do max(v : Vector) -> Int {
+    let live n : Int = length(v);
+    if n == 0 { return 0; };
+    let live result : Int = get(v, 0);
+    let live i : Int = 1;
+    while i < n {
+        if get(v, i) > result {
+            result = get(v, i);
+        };
+        i = i + 1;
+    };
+    result
+}
+
+do min(v : Vector) -> Int {
+    let live n : Int = length(v);
+    if n == 0 { return 0; };
+    let live result : Int = get(v, 0);
+    let live i : Int = 1;
+    while i < n {
+        if get(v, i) < result {
+            result = get(v, i);
+        };
+        i = i + 1;
+    };
+    result
+}
+
+do reverse(v : Vector) -> Int {
+    let live n : Int = length(v);
+    let live i : Int = 0;
+    while i < n / 2 {
+        let live tmp : Int = get(v, i);
+        set(v, i, get(v, n - 1 - i));
+        set(v, n - 1 - i, tmp);
+        i = i + 1;
+    };
+    0
+}
+
+do to_string(v : Vector) -> String {
+    let live n : Int = length(v);
+    let live result : String = "[";
+    let live i : Int = 0;
+    while i < n {
+        result = m0_string_concat(result, m0_int_to_string(get(v, i)));
+        if i < n - 1 {
+            result = m0_string_concat(result, ", ");
+        };
+        i = i + 1;
+    };
+    result = m0_string_concat(result, "]");
+    result
+}

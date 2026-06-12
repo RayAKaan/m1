@@ -1,0 +1,10 @@
+world WasNeverTest {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        set live x : Int = 42;
+        set _ : Int = say(int_to_string(was x.live));
+        0
+    }
+}

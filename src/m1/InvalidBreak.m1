@@ -1,0 +1,6 @@
+world InvalidBreak {
+    do main() -> Int {
+        break;
+        0
+    }
+}

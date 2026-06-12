@@ -1,0 +1,10 @@
+world Test {
+    external "say" : String -> Int
+    external "int_to_string" : Int -> String
+    do main() -> Int {
+        set x : Int = 42;
+        set y : Int = 10;
+        set tmp : Int = say(int_to_string(5));
+        0
+    }
+}

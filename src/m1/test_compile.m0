@@ -1,0 +1,9 @@
+module CompileTest {
+    type Pair = { first : Int, second : Int }
+    fn make_pair(a : Int, b : Int) -> Pair { { first = a, second = b } }
+    fn add(a : Int, b : Int) -> Int { a + b }
+    fn main() -> Int {
+        let p : Pair = make_pair(10, 20);
+        add(p.first, p.second)
+    }
+}

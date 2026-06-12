@@ -1,0 +1,11 @@
+module TestMatch {
+    type Color = | Red | Green | Blue
+
+    fn name(c : Color) -> String {
+        match c {
+            Red -> "red";
+            Green -> "green";
+            Blue -> "blue";
+        }
+    }
+}

@@ -1,0 +1,8 @@
+world FreezeReturnTest {
+    do main() -> Int {
+        set live x : Int = 10;
+        freeze x;
+        set _ : Int = when x > 5 then { say("gt5") };
+        0
+    }
+}

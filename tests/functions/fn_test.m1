@@ -1,0 +1,6 @@
+world Test {
+    do double_it(x : Int) -> Int { x + x }
+    do main() -> Int {
+        say(int_to_string(double_it(21)))
+    }
+}

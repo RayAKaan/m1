@@ -1,0 +1,6 @@
+module main;
+import nonexistent;
+
+do main() -> Int {
+    0
+}

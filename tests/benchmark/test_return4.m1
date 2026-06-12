@@ -1,0 +1,11 @@
+world TestReturn4 {
+    do f(x : Int) -> Int {
+        if x < 0 { return 0; };
+        x + 1
+    }
+    do main() -> Int {
+        set a : Int = f(5);
+        set b : Int = f(-3);
+        0
+    }
+}

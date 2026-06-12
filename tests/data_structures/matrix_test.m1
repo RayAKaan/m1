@@ -1,0 +1,17 @@
+world MatrixTest {
+    do main() -> Int {
+        set m : Int = matrix_new(3, 3);
+        set live i : Int = 0;
+        set _ : Int = while i < 3 {
+            set live j : Int = 0;
+            set _ : Int = while j < 3 {
+                set _ : Int = matrix_set(m, i, j, i * 3 + j + 1);
+                j = j + 1
+            };
+            i = i + 1
+        };
+        set _ : Int = say(int_to_string(matrix_get(m, 0, 0)));
+        set _ : Int = say(int_to_string(matrix_get(m, 1, 1)));
+        say(int_to_string(matrix_get(m, 2, 2)))
+    }
+}

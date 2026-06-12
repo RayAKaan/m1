@@ -1,0 +1,20 @@
+module Test {
+    fn constant() -> Int { 3 + 4 }
+    fn inline_let() -> Int { let x : Int = 5; x + 1 }
+    fn fold_if() -> Int { if true { 10 } else { 20 } }
+    fn reduce_match() -> Int {
+        match 0 {
+            0 -> 100;
+            _ -> 200;
+        }
+    }
+    fn field_proj() -> Int { { a = 7, b = 8 }.a }
+    fn nested() -> Int { let a : Int = 2; let b : Int = 3; a * b + a }
+    fn identity() -> Int { (fn(x : Int) -> Int { x })(42) }
+    fn dup() -> Int { let x : Int = 6; x + x }
+    fn neg_zero() -> Int { 0 - 0 }
+    fn bool_and() -> Bool { true /\ false }
+    fn bool_or() -> Bool { false \/ true }
+    fn not_true() -> Bool { not true }
+    fn main() -> Int { constant() + inline_let() + fold_if() + reduce_match() + field_proj() }
+}

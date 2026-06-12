@@ -1,0 +1,32 @@
+module main;
+import std.string;
+
+do main() -> Int {
+    -- concat
+    let live a : String = std.string.concat("hello", " world");
+    say(a);
+
+    -- length
+    say(int_to_string(std.string.length(a)));
+
+    -- equals
+    say(int_to_string(std.string.equals("hello world", a)));
+
+    -- starts_with
+    say(int_to_string(std.string.starts_with(a, "hello")));
+
+    -- ends_with
+    say(int_to_string(std.string.ends_with(a, "world")));
+
+    -- contains
+    say(int_to_string(std.string.contains(a, "lo w")));
+
+    -- contains false
+    say(int_to_string(std.string.contains(a, "xyz")));
+
+    -- to_int / from_int
+    say(int_to_string(std.string.to_int("42")));
+    say(std.string.from_int(99));
+
+    0
+}

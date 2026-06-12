@@ -1,0 +1,4 @@
+module Test {
+    external "func1" : Int -> Int
+    external "func2" : Int -> Int
+}

@@ -1,0 +1,34 @@
+module Test {
+    external "m0_string_eq" : String -> String -> Int
+    type M1Tk = | TkIdent | TkModule | TkType | TkFn | TkLet
+               | TkMatch | TkIf | TkElse | TkTrue | TkFalse
+               | TkExternal | TkNot | TkForall | TkExists
+               | TkLinear | TkAffine | TkPersistent | TkEventual
+    type M1Token = { kind : M1Tk, line : Int, col : Int, int_val : Int, str_val : String }
+
+    fn mk_tok(k : M1Tk) -> M1Token { { kind = k, line = 0, col = 0, int_val = 0, str_val = "" } }
+
+    fn kw(s : String, line : Int, col : Int) -> M1Token {
+        if m0_string_eq(s, "module") == 1 { mk_tok(TkModule) } else {
+        if m0_string_eq(s, "type") == 1 { mk_tok(TkType) } else {
+        if m0_string_eq(s, "fn") == 1 { mk_tok(TkFn) } else {
+        if m0_string_eq(s, "let") == 1 { mk_tok(TkLet) } else {
+        if m0_string_eq(s, "match") == 1 { mk_tok(TkMatch) } else {
+        if m0_string_eq(s, "if") == 1 { mk_tok(TkIf) } else {
+        if m0_string_eq(s, "else") == 1 { mk_tok(TkElse) } else {
+        if m0_string_eq(s, "true") == 1 { mk_tok(TkTrue) } else {
+        if m0_string_eq(s, "false") == 1 { mk_tok(TkFalse) } else {
+        if m0_string_eq(s, "external") == 1 { mk_tok(TkExternal) } else {
+        if m0_string_eq(s, "not") == 1 { mk_tok(TkNot) } else {
+        if m0_string_eq(s, "forall") == 1 { mk_tok(TkForall) } else {
+        if m0_string_eq(s, "exists") == 1 { mk_tok(TkExists) } else {
+        if m0_string_eq(s, "Linear") == 1 { mk_tok(TkLinear) } else {
+        if m0_string_eq(s, "Affine") == 1 { mk_tok(TkAffine) } else {
+        if m0_string_eq(s, "Persistent") == 1 { mk_tok(TkPersistent) } else {
+        if m0_string_eq(s, "Eventual") == 1 { mk_tok(TkEventual) } else {
+        mk_tok(TkIdent)
+        }}}}}}}}}}}}}}}}}}
+    }
+
+    fn foo(x : Int) -> Int { x }
+}

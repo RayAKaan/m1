@@ -1,0 +1,156 @@
+module M1Lexer {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_substr" : String -> Int -> Int -> String
+    external "m0_string_eq" : String -> String -> Int
+    external "m0_string_len" : String -> Int
+    external "m0_print" : String -> Int
+    external "m0_print_int" : Int -> Int
+
+    type M1Tk = | TkEof | TkInt | TkFloat | TkString | TkChar | TkIdent
+               | TkArrow | TkLArrow | TkBidi | TkEq | TkEqEq | TkNeq
+               | TkLt | TkGt | TkLe | TkGe
+               | TkAnd | TkOr | TkPipe | TkColon | TkComma | TkDot | TkSemi | TkAt
+               | TkLBrace | TkRBrace | TkLParen | TkRParen | TkLBrack | TkRBrack
+               | TkPlus | TkMinus | TkStar | TkSlash | TkPercent | TkUnit
+               | TkModule | TkType | TkFn | TkLet | TkMatch | TkIf | TkElse
+               | TkTrue | TkFalse | TkExternal | TkNot
+               | TkForall | TkExists
+               | TkLinear | TkAffine | TkPersistent | TkEventual
+
+    type M1Token = {
+        kind : M1Tk,
+        line : Int,
+        col : Int,
+        int_val : Int,
+        str_val : String
+    }
+
+    type M1Lexer = {
+        src : String,
+        pos : Int,
+        line : Int,
+        col : Int
+    }
+
+    type M1LexResult = {
+        token : M1Token,
+        lexer : M1Lexer
+    }
+
+    fn mk_tok(k : M1Tk) -> M1Token {
+        { kind = k, line = 0, col = 0, int_val = 0, str_val = "" }
+    }
+
+    fn mk_tok_loc(k : M1Tk, line : Int, col : Int) -> M1Token {
+        { kind = k, line = line, col = col, int_val = 0, str_val = "" }
+    }
+
+    fn mk_int_tok(val : Int, line : Int, col : Int) -> M1Token {
+        { kind = TkInt, line = line, col = col, int_val = val, str_val = "" }
+    }
+
+    fn mk_str_tok(k : M1Tk, val : String, line : Int, col : Int) -> M1Token {
+        { kind = k, line = line, col = col, int_val = 0, str_val = val }
+    }
+
+    fn peek(l : M1Lexer) -> Int {
+        m0_char_at(l.src, l.pos)
+    }
+
+    fn peek_at(l : M1Lexer, offset : Int) -> Int {
+        m0_char_at(l.src, l.pos + offset)
+    }
+
+    fn advance(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == 10 { { src = l.src, pos = l.pos + 1, line = l.line + 1, col = 1 } }
+        else { { src = l.src, pos = l.pos + 1, line = l.line, col = l.col + 1 } }
+    }
+
+    fn advance_n(l : M1Lexer, n : Int) -> M1Lexer {
+        if n <= 0 { l } else { advance_n(advance(l), n - 1) }
+    }
+
+    fn is_space(c : Int) -> Bool {
+        (c == 32) \/ (c == 9) \/ (c == 10) \/ (c == 13)
+    }
+
+    fn is_alpha(c : Int) -> Bool {
+        ((c >= 65) /\ (c <= 90)) \/ ((c >= 97) /\ (c <= 122)) \/ (c == 95)
+    }
+
+    fn is_digit(c : Int) -> Bool {
+        (c >= 48) /\ (c <= 57)
+    }
+
+    fn is_alnum(c : Int) -> Bool {
+        is_alpha(c) \/ is_digit(c)
+    }
+
+    fn skip_line(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == -1 { l } else {
+            if c == 10 { advance(l) } else { skip_line(advance(l)) }
+        }
+    }
+
+    fn skip_block(l : M1Lexer, depth : Int) -> M1Lexer {
+        if depth == 0 { l } else {
+            let c : Int = peek(l);
+            if c == -1 { l } else {
+                if (c == 123) /\ (peek_at(l, 1) == 45) {
+                    skip_block(advance_n(l, 2), depth + 1)
+                } else {
+                    if (c == 45) /\ (peek_at(l, 1) == 125) {
+                        skip_block(advance_n(l, 2), depth - 1)
+                    } else { skip_block(advance(l), depth) }
+                }
+            }
+        }
+    }
+
+    fn skip_ws(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == -1 { l } else {
+            if is_space(c) { skip_ws(advance(l)) } else {
+                if (c == 45) /\ (peek_at(l, 1) == 45) {
+                    skip_ws(skip_line(advance_n(l, 2)))
+                } else {
+                    if (c == 123) /\ (peek_at(l, 1) == 45) {
+                        skip_ws(skip_block(advance_n(l, 2), 1))
+                    } else { l }
+                }
+            }
+        }
+    }
+
+    fn keyword_or_ident(s : String, line : Int, col : Int) -> M1Token {
+        if m0_string_eq(s, "module") == 1 { mk_tok_loc(TkModule, line, col) } else {
+        if m0_string_eq(s, "type") == 1 { mk_tok_loc(TkType, line, col) } else {
+        if m0_string_eq(s, "fn") == 1 { mk_tok_loc(TkFn, line, col) } else {
+        if m0_string_eq(s, "let") == 1 { mk_tok_loc(TkLet, line, col) } else {
+        if m0_string_eq(s, "match") == 1 { mk_tok_loc(TkMatch, line, col) } else {
+        if m0_string_eq(s, "if") == 1 { mk_tok_loc(TkIf, line, col) } else {
+        if m0_string_eq(s, "else") == 1 { mk_tok_loc(TkElse, line, col) } else {
+        if m0_string_eq(s, "true") == 1 { mk_tok_loc(TkTrue, line, col) } else {
+        if m0_string_eq(s, "false") == 1 { mk_tok_loc(TkFalse, line, col) } else {
+        if m0_string_eq(s, "external") == 1 { mk_tok_loc(TkExternal, line, col) } else {
+        if m0_string_eq(s, "not") == 1 { mk_tok_loc(TkNot, line, col) } else {
+        if m0_string_eq(s, "forall") == 1 { mk_tok_loc(TkForall, line, col) } else {
+        if m0_string_eq(s, "exists") == 1 { mk_tok_loc(TkExists, line, col) } else {
+        if m0_string_eq(s, "Linear") == 1 { mk_tok_loc(TkLinear, line, col) } else {
+        if m0_string_eq(s, "Affine") == 1 { mk_tok_loc(TkAffine, line, col) } else {
+        if m0_string_eq(s, "Persistent") == 1 { mk_tok_loc(TkPersistent, line, col) } else {
+        if m0_string_eq(s, "Eventual") == 1 { mk_tok_loc(TkEventual, line, col) } else {
+        mk_str_tok(TkIdent, s, line, col)
+        }}}}}}}}}}}}}}}}}}
+    }
+
+    fn parse_int_rec(s : String, i : Int, len : Int, acc : Int) -> Int {
+        if i >= len { acc } else {
+            let c : Int = m0_char_at(s, i);
+            parse_int_rec(s, i + 1, len, acc * 10 + (c - 48))
+        }
+    }
+}
+

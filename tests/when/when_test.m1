@@ -1,0 +1,8 @@
+world WhenTest {
+    do main() -> Int {
+        set live balance : Int = 5000;
+        set _ : Int = when balance > 10000 then { say(int_to_string(balance)) };
+        set _ : Int = balance = 15000;
+        0
+    }
+}

@@ -1,0 +1,6 @@
+world IfTest {
+    do f(x : Int) -> Int {
+        if x < 0 { 0 };
+        x + 1
+    }
+}

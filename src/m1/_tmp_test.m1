@@ -1,0 +1,11 @@
+world FreezeTest {
+    external "say" : String -> Int
+    external "int_to_string" : Int -> String
+    do main() -> Int {
+        set live x : Int = 10;
+        set x : Int = 20;
+        set _ : Int = freeze x;
+        set _ : Int = say(int_to_string(x));
+        0
+    }
+}

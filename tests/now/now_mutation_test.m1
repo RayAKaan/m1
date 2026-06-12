@@ -1,0 +1,11 @@
+world NowMutationTest {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        set live balance : Int = 1000;
+        set _ : Int = now balance >= 0;
+        set _ : Int = balance = balance - 2000;
+        say(int_to_string(balance))
+    }
+}

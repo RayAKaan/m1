@@ -1,0 +1,13 @@
+world Match {
+    do classify(n : Int) -> Int {
+        pick n {
+            0 -> 1;
+            _ -> n * 2;
+        }
+    }
+    do main() -> Int {
+        set _ : Int = say(int_to_string(classify(0)));
+        set _ : Int = say(int_to_string(classify(5)));
+        0
+    }
+}

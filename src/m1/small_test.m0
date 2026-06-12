@@ -1,0 +1,29 @@
+module test {
+  fn main() -> Int { 42 }
+  fn a() -> Int { 1 }
+  fn b() -> Int { 2 }
+  fn c() -> Int { 3 }
+  fn d() -> Int { 4 }
+  fn e() -> Int { 5 }
+  fn f() -> Int { 6 }
+  fn g() -> Int { 7 }
+  fn h() -> Int { 8 }
+  fn i() -> Int { 9 }
+  fn j() -> Int { 10 }
+  fn k() -> Int { 11 }
+  fn l() -> Int { 12 }
+  fn m() -> Int { 13 }
+  fn n() -> Int { 14 }
+  fn o() -> Int { 15 }
+  fn p() -> Int { 16 }
+  fn q() -> Int { 17 }
+  fn r() -> Int { 18 }
+  fn s() -> Int { 19 }
+  fn t() -> Int { 20 }
+  fn u() -> Int { 21 }
+  fn v() -> Int { 22 }
+  fn w() -> Int { 23 }
+  fn x() -> Int { 24 }
+  fn y() -> Int { 25 }
+  fn z() -> Int { 26 }
+}

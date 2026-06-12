@@ -1,0 +1,19 @@
+world OrderTest {
+    do main() -> Int {
+        set Draft : Int = 0;
+        set Confirmed : Int = 1;
+        set Shipped : Int = 2;
+        set Delivered : Int = 3;
+
+        set live order : Int = Draft;
+        set _ : Int = say(int_to_string(was order.Draft));
+        set _ : Int = order = Confirmed;
+        set _ : Int = say(int_to_string(was order.Confirmed));
+        set _ : Int = say(int_to_string(was order.Shipped));
+        set _ : Int = order = Shipped;
+        set _ : Int = say(int_to_string(was order.Shipped));
+        set _ : Int = order = Delivered;
+        set _ : Int = say(int_to_string(was order.Delivered));
+        0
+    }
+}

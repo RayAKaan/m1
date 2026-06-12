@@ -1,0 +1,9 @@
+module main;
+import bank;
+
+do main() -> Int {
+    set live acc : Int = bank.create_account(500);
+    set live acc2 : Int = bank.withdraw(acc, 600);
+    say(int_to_string(acc2));
+    0
+}

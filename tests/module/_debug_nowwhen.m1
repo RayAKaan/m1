@@ -1,0 +1,6 @@
+module test;
+do foo(x : Int) -> Int {
+    set _ : Int = now x >= 0;
+    set _ : Int = when x < 0 then { say("neg") };
+    x
+}

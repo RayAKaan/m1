@@ -1,0 +1,16 @@
+world TokenTest {
+    do main() -> Int {
+        set Issued : Int = 0;
+        set Used : Int = 1;
+        set Expired : Int = 2;
+
+        set live token : Int = Issued;
+        set _ : Int = will token.Used;
+        set _ : Int = say(int_to_string(was token.Issued));
+        set _ : Int = token = Used;
+        set _ : Int = say(int_to_string(was token.Used));
+        set _ : Int = token = Expired;
+        set _ : Int = say(int_to_string(was token.Expired));
+        0
+    }
+}

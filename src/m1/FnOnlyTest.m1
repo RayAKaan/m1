@@ -1,0 +1,5 @@
+world FnOnlyTest {
+    do f(x : Int) -> Int {
+        x + 1
+    }
+}

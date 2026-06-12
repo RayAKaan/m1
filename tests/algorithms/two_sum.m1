@@ -1,0 +1,26 @@
+world TwoSum {
+    do build_map(nums : Int) -> Int {
+        set m : Int = map_new();
+        set live i : Int = 0;
+        set _ : Int = while i < vector_len(nums) {
+            set _ : Int = map_set(m, vector_get(nums, i), i);
+            i = i + 1
+        };
+        m
+    }
+
+    do find_match(nums : Int, m : Int, target : Int, i : Int) -> Int {
+        map_get(m, target - vector_get(nums, i))
+    }
+
+    do main() -> Int {
+        set nums : Int = vector_new();
+        set _ : Int = vector_push(nums, 2);
+        set _ : Int = vector_push(nums, 7);
+        set _ : Int = vector_push(nums, 11);
+        set _ : Int = vector_push(nums, 15);
+        set m : Int = build_map(nums);
+        set idx : Int = find_match(nums, m, 9, 0);
+        say(string_concat("Found: ", int_to_string(vector_get(nums, idx))))
+    }
+}

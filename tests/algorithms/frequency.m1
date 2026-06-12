@@ -1,0 +1,28 @@
+world Frequency {
+    do count_freq(nums : Int) -> Int {
+        set m : Int = map_new();
+        set live i : Int = 0;
+        set _ : Int = while i < vector_len(nums) {
+            set num : Int = vector_get(nums, i);
+            set old : Int = map_get(m, num);
+            set _ : Int = map_set(m, num, old + 1);
+            i = i + 1
+        };
+        m
+    }
+
+    do main() -> Int {
+        set nums : Int = vector_new();
+        set _ : Int = vector_push(nums, 1);
+        set _ : Int = vector_push(nums, 3);
+        set _ : Int = vector_push(nums, 2);
+        set _ : Int = vector_push(nums, 1);
+        set _ : Int = vector_push(nums, 2);
+        set _ : Int = vector_push(nums, 1);
+        set m : Int = count_freq(nums);
+        set _ : Int = say(string_concat("Unique count: ", int_to_string(map_len(m))));
+        set _ : Int = say(string_concat("1 appears: ", int_to_string(map_get(m, 1))));
+        set _ : Int = say(string_concat("2 appears: ", int_to_string(map_get(m, 2))));
+        say(string_concat("3 appears: ", int_to_string(map_get(m, 3))))
+    }
+}

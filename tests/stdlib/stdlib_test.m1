@@ -1,0 +1,11 @@
+world StdlibTest {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        set _ : Int = say("Hello from M1!");
+        set _ : Int = say(int_to_string(42));
+        set _ : Int = say(string_concat("foo", "bar"));
+        0
+    }
+}

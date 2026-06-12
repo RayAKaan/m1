@@ -1,0 +1,3 @@
+module TestType2 { external "m0_print" : String -> Int
+ fn greet(n : String) -> Int { m0_print(n); 0 }
+ fn main() -> Int { greet("x"); 0 } }

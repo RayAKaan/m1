@@ -1,0 +1,9 @@
+world Fib {
+    do fib(n : Int) -> Int {
+        if n <= 1 { n } else fib(n - 1) + fib(n - 2)
+    }
+    do main() -> Int {
+        set _ : Int = say(int_to_string(fib(10)));
+        0
+    }
+}

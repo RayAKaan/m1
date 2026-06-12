@@ -1,0 +1,15 @@
+module Test {
+    external "m0_string_eq" : String -> String -> Int
+    type M1Tk = | TkIdent | TkModule | TkType | TkFn | TkLet
+    type M1Token = { kind : M1Tk, line : Int, col : Int, int_val : Int, str_val : String }
+    fn mk_tok(k : M1Tk) -> M1Token { { kind = k, line = 0, col = 0, int_val = 0, str_val = "" } }
+    fn kw(s : String) -> M1Token {
+        if m0_string_eq(s, "module") == 1 { mk_tok(TkModule) } else {
+        if m0_string_eq(s, "type") == 1 { mk_tok(TkType) } else {
+        if m0_string_eq(s, "fn") == 1 { mk_tok(TkFn) } else {
+        if m0_string_eq(s, "let") == 1 { mk_tok(TkLet) } else {
+        mk_tok(TkIdent)
+        }}}}}
+    }
+    fn foo(x : Int) -> Int { x }
+}

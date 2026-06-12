@@ -1,0 +1,85 @@
+module M1Lexer {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_substr" : String -> Int -> Int -> String
+    external "m0_string_eq" : String -> String -> Int
+    external "m0_string_len" : String -> Int
+    external "m0_print" : String -> Int
+    external "m0_print_int" : Int -> Int
+
+    type M1Tk = | TkEof | TkInt | TkFloat | TkString
+    type M1Token = {
+        kind : M1Tk,
+        line : Int,
+        col : Int,
+        int_val : Int,
+        str_val : String
+    }
+    type M1Lexer = {
+        src : String,
+        pos : Int,
+        line : Int,
+        col : Int
+    }
+    type M1LexResult = {
+        token : M1Token,
+        lexer : M1Lexer
+    }
+
+    fn mk_int_tok(val : Int, line : Int, col : Int) -> M1Token {
+        { kind = TkInt, line = line, col = col, int_val = val, str_val = "" }
+    }
+
+    fn peek(l : M1Lexer) -> Int {
+        m0_char_at(l.src, l.pos)
+    }
+    fn peek_at(l : M1Lexer, offset : Int) -> Int {
+        m0_char_at(l.src, l.pos + offset)
+    }
+
+    fn advance(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == 10 { { src = l.src, pos = l.pos + 1, line = l.line + 1, col = 1 } }
+        else { { src = l.src, pos = l.pos + 1, line = l.line, col = l.col + 1 } }
+    }
+
+    fn is_digit(c : Int) -> Bool {
+        (c >= 48) /\ (c <= 57)
+    }
+
+    fn parse_int_rec(s : String, i : Int, len : Int, acc : Int) -> Int {
+        if i >= len { acc } else {
+            let c : Int = m0_char_at(s, i);
+            parse_int_rec(s, i + 1, len, acc * 10 + (c - 48))
+        }
+    }
+
+    fn parse_int(s : String) -> Int {
+        parse_int_rec(s, 0, m0_string_len(s), 0)
+    }
+
+    fn scan_float(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if is_digit(c) {
+            scan_float(advance(l), start, line, col)
+        } else {
+            let s : String = m0_substr(l.src, start, l.pos);
+            let v : Int = parse_int(s);
+            { token = mk_int_tok(v, line, col), lexer = l }
+        }
+    }
+
+    fn scan_int(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if is_digit(c) {
+            scan_int(advance(l), start, line, col)
+        } else {
+            if (c == 46) /\ is_digit(peek_at(l, 1)) {
+                scan_float(advance(l), start, line, col)
+            } else {
+                let s : String = m0_substr(l.src, start, l.pos);
+                let v : Int = parse_int(s);
+                { token = mk_int_tok(v, line, col), lexer = l }
+            }
+        }
+    }
+}

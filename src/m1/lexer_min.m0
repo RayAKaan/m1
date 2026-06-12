@@ -1,0 +1,368 @@
+module M1Lexer {
+    external "m0_char_at" : String -> Int -> Int    external "m0_substr" : String -> Int -> Int -> String    external "m0_string_eq" : String -> String -> Int    external "m0_string_len" : String -> Int    external "m0_print" : String -> Int    external "m0_print_int" : Int -> Int    external "m0_print_char" : Int -> Int    type M1Tk = | TkEof | TkInt | TkFloat | TkString | TkChar | TkIdent               | TkArrow | TkLArrow | TkBidi | TkEq | TkEqEq | TkNeq               | TkLt | TkGt | TkLe | TkGe               | TkAnd | TkOr | TkPipe | TkColon | TkComma | TkDot | TkSemi | TkAt               | TkLBrace | TkRBrace | TkLParen | TkRParen | TkLBrack | TkRBrack               | TkPlus | TkMinus | TkStar | TkSlash | TkPercent | TkUnit               | TkModule | TkType | TkFn | TkLet | TkMatch | TkIf | TkElse               | TkTrue | TkFalse | TkExternal | TkNot                | TkForall | TkExists                | TkMut | TkWhile                 | TkFreeze | TkNow | TkWwas | TkWhen | TkWill                 | TkWorld | TkDo | TkSet | TkPick | TkShape                 | TkLive | TkSay | TkShow | TkThen    type M1Token = {
+        kind : M1Tk,        line : Int,        col : Int,        int_val : Int,        str_val : String    }    type M1Lexer = {
+        src : String,        pos : Int,        line : Int,        col : Int    }    type M1LexResult = {
+        token : M1Token,        lexer : M1Lexer    }    fn mk_tok(kind : M1Tk, line : Int, col : Int) -> M1Token {
+        {
+ kind = kind, line = line, col = col, int_val = 0, str_val = "" }    }    fn mk_int_tok(val : Int, line : Int, col : Int) -> M1Token {
+        {
+ kind = TkInt, line = line, col = col, int_val = val, str_val = "" }    }    fn mk_str_tok(kind : M1Tk, val : String, line : Int, col : Int) -> M1Token {
+        {
+ kind = kind, line = line, col = col, int_val = 0, str_val = val }    }    fn peek(l : M1Lexer) -> Int {
+        m0_char_at(l.src, l.pos)    }    fn peek_at(l : M1Lexer, offset : Int) -> Int {
+        m0_char_at(l.src, l.pos + offset)    }    fn advance(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == 10 {
+            {
+ src = l.src, pos = l.pos + 1, line = l.line + 1, col = 1 }        } else {
+            {
+ src = l.src, pos = l.pos + 1, line = l.line, col = l.col + 1 }        }    }    fn advance_n(l : M1Lexer, n : Int) -> M1Lexer {
+        if n <= 0 {
+ l } else {
+ advance_n(advance(l), n - 1) }    }    fn is_space(c : Int) -> Bool {
+        (c == 32) \/ (c == 9) \/ (c == 10) \/ (c == 13)    }    fn is_alpha(c : Int) -> Bool {
+        ((c >= 65) /\ (c <= 90)) \/ ((c >= 97) /\ (c <= 122)) \/ (c == 95)    }    fn is_digit(c : Int) -> Bool {
+        (c >= 48) /\ (c <= 57)    }    fn is_alnum(c : Int) -> Bool {
+        is_alpha(c) \/ is_digit(c)    }    fn skip_line(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == -1 {
+ l } else {
+            if c == 10 {
+ l } else {
+ skip_line(advance(l)) }        }    }    fn skip_block(l : M1Lexer, depth : Int) -> M1Lexer {
+        if depth == 0 {
+ l } else {
+            let c : Int = peek(l);
+            if c == -1 {
+ l } else {
+                if (c == 123) /\ (peek_at(l, 1) == 45) {
+                    skip_block(advance_n(l, 2), depth + 1)                } else {
+                    if (c == 45) /\ (peek_at(l, 1) == 125) {
+                        skip_block(advance_n(l, 2), depth - 1)                    } else {
+ skip_block(advance(l), depth) }                }            }        }    }    fn skip_ws(l : M1Lexer) -> M1Lexer {
+        let c : Int = peek(l);
+        if c == -1 {
+ l } else {
+            if is_space(c) {
+ skip_ws(advance(l)) } else {
+                if (c == 45) /\ (peek_at(l, 1) == 45) {
+                    skip_ws(skip_line(advance_n(l, 2)))                } else {
+                    if (c == 123) /\ (peek_at(l, 1) == 45) {
+                        skip_ws(skip_block(advance_n(l, 2), 1))                    } else {
+ l }                }            }        }    }    fn keyword_or_ident(s : String, line : Int, col : Int) -> M1Token {
+        if m0_string_eq(s, "module") == 1 {
+ mk_tok(TkModule, line, col) } else {
+        if m0_string_eq(s, "type") == 1 {
+ mk_tok(TkType, line, col) } else {
+        if m0_string_eq(s, "fn") == 1 {
+ mk_tok(TkFn, line, col) } else {
+        if m0_string_eq(s, "let") == 1 {
+ mk_tok(TkLet, line, col) } else {
+        if m0_string_eq(s, "match") == 1 {
+ mk_tok(TkMatch, line, col) } else {
+        if m0_string_eq(s, "if") == 1 {
+ mk_tok(TkIf, line, col) } else {
+        if m0_string_eq(s, "else") == 1 {
+ mk_tok(TkElse, line, col) } else {
+        if m0_string_eq(s, "true") == 1 {
+ mk_tok(TkTrue, line, col) } else {
+        if m0_string_eq(s, "false") == 1 {
+ mk_tok(TkFalse, line, col) } else {
+        if m0_string_eq(s, "external") == 1 {
+ mk_tok(TkExternal, line, col) } else {
+        if m0_string_eq(s, "not") == 1 {
+ mk_tok(TkNot, line, col) } else {
+        if m0_string_eq(s, "forall") == 1 {
+ mk_tok(TkForall, line, col) } else {
+        if m0_string_eq(s, "exists") == 1 {
+ mk_tok(TkExists, line, col) } else {
+        if m0_string_eq(s, "mut") == 1 {
+ mk_tok(TkMut, line, col) } else {
+        if m0_string_eq(s, "while") == 1 {
+ mk_tok(TkWhile, line, col) } else {
+        if m0_string_eq(s, "freeze") == 1 {
+ mk_tok(TkFreeze, line, col) } else {
+        if m0_string_eq(s, "now") == 1 {
+ mk_tok(TkNow, line, col) } else {
+        if m0_string_eq(s, "was") == 1 {
+ mk_tok(TkWwas, line, col) } else {
+        if m0_string_eq(s, "when") == 1 {
+ mk_tok(TkWhen, line, col) } else {
+        if m0_string_eq(s, "will") == 1 {
+ mk_tok(TkWill, line, col) } else {
+        if m0_string_eq(s, "world") == 1 {
+ mk_tok(TkWorld, line, col) } else {
+        if m0_string_eq(s, "do") == 1 {
+ mk_tok(TkDo, line, col) } else {
+        if m0_string_eq(s, "set") == 1 {
+ mk_tok(TkSet, line, col) } else {
+        if m0_string_eq(s, "pick") == 1 {
+ mk_tok(TkPick, line, col) } else {
+        if m0_string_eq(s, "shape") == 1 {
+ mk_tok(TkShape, line, col) } else {
+        if m0_string_eq(s, "live") == 1 {
+ mk_tok(TkLive, line, col) } else {
+        if m0_string_eq(s, "say") == 1 {
+ mk_tok(TkSay, line, col) } else {
+        if m0_string_eq(s, "show") == 1 {
+ mk_tok(TkShow, line, col) } else {
+        if m0_string_eq(s, "then") == 1 {
+ mk_tok(TkThen, line, col) } else {
+        mk_str_tok(TkIdent, s, line, col)        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}    fn scan_ident(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if is_alnum(c) {
+            scan_ident(advance(l), start, line, col)        } else {
+            let s : String = m0_substr(l.src, start, l.pos);
+            if (m0_string_eq(s, "Int") == 1) /\ (m0_char_at(l.src, start - 1) != 40) {
+                {
+ token = mk_str_tok(TkInt, s, line, col), lexer = l }            } else {
+                {
+ token = keyword_or_ident(s, line, col), lexer = l }            }        }    }    fn parse_int_rec(s : String, i : Int, len : Int, acc : Int) -> Int {
+        if i >= len {
+ acc } else {
+            let c : Int = m0_char_at(s, i);
+            parse_int_rec(s, i + 1, len, acc * 10 + (c - 48))        }    }    fn parse_int(s : String) -> Int {
+        parse_int_rec(s, 0, m0_string_len(s), 0)    }    fn scan_float(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if is_digit(c) {
+            scan_float(advance(l), start, line, col)        } else {
+            let s : String = m0_substr(l.src, start, l.pos);
+            {
+ token = mk_str_tok(TkFloat, s, line, col), lexer = l }        }    }    fn scan_int(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if is_digit(c) {
+            scan_int(advance(l), start, line, col)        } else {
+            if (c == 46) /\ is_digit(peek_at(l, 1)) {
+                scan_float(advance(l), start, line, col)            } else {
+                let s : String = m0_substr(l.src, start, l.pos);
+                let v : Int = parse_int(s);
+                {
+ token = mk_int_tok(v, line, col), lexer = l }            }        }    }    fn scan_string(l : M1Lexer, start : Int, line : Int, col : Int) -> M1LexResult {
+        let c : Int = peek(l);
+        if c == 34 {
+            let s : String = m0_substr(l.src, start, l.pos);
+            {
+ token = mk_str_tok(TkString, s, line, col), lexer = advance(l) }        } else {
+            if c == -1 {
+                let s : String = m0_substr(l.src, start, l.pos);
+                {
+ token = mk_str_tok(TkString, s, line, col), lexer = l }            } else {
+                if c == 92 {
+ scan_string(advance_n(l, 2), start, line, col) }                else {
+ scan_string(advance(l), start, line, col) }            }        }    }    fn scan_char(l : M1Lexer, line : Int, col : Int) -> M1LexResult {
+        let v : Int = peek_at(l, 1);
+        if v == 92 {
+            let e : Int = peek_at(l, 2);
+            if e == 110 {
+ {
+ token = mk_int_tok(10, line, col), lexer = advance_n(l, 4) } } else {
+            if e == 116 {
+ {
+ token = mk_int_tok(9, line, col), lexer = advance_n(l, 4) } } else {
+            {
+ token = mk_int_tok(e, line, col), lexer = advance_n(l, 4) }}}        } else {
+            {
+ token = {
+ kind = TkChar, line = line, col = col, int_val = v, str_val = "" }, lexer = advance_n(l, 3) }        }    }    fn m1_lexer_init(src : String) -> M1Lexer {
+        {
+ src = src, pos = 0, line = 1, col = 1 }    }    fn m1_lexer_next(l : M1Lexer) -> M1LexResult {
+        let l2 : M1Lexer = skip_ws(l);
+        let c : Int = peek(l2);
+        let line : Int = l2.line;
+        let col : Int = l2.col;
+        if c == -1 {
+ {
+ token = mk_tok(TkEof, line, col), lexer = l2 } } else {
+        if (c == 40) /\ (peek_at(l2, 1) == 41) {
+            {
+ token = mk_tok(TkUnit, line, col), lexer = advance_n(l2, 2) }        } else {
+        if c == 34 {
+            scan_string(advance(l2), l2.pos + 1, line, col)        } else {
+        if c == 39 {
+            scan_char(l2, line, col)        } else {
+        if is_digit(c) {
+ scan_int(l2, l2.pos, line, col) } else {
+        if is_alpha(c) {
+ scan_ident(l2, l2.pos, line, col) } else {
+        if ((c == 60) /\ (peek_at(l2, 1) == 45)) /\ (peek_at(l2, 2) == 62) {
+            {
+ token = mk_tok(TkBidi, line, col), lexer = advance_n(l2, 3) }        } else {
+        if (c == 60) /\ (peek_at(l2, 1) == 45) {
+            {
+ token = mk_tok(TkLArrow, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 45) /\ (peek_at(l2, 1) == 62) {
+            {
+ token = mk_tok(TkArrow, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 60) /\ (peek_at(l2, 1) == 61) {
+            {
+ token = mk_tok(TkLe, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 62) /\ (peek_at(l2, 1) == 61) {
+            {
+ token = mk_tok(TkGe, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 61) /\ (peek_at(l2, 1) == 61) {
+            {
+ token = mk_tok(TkEqEq, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 33) /\ (peek_at(l2, 1) == 61) {
+            {
+ token = mk_tok(TkNeq, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 47) /\ (peek_at(l2, 1) == 92) {
+            {
+ token = mk_tok(TkAnd, line, col), lexer = advance_n(l2, 2) }        } else {
+        if (c == 92) /\ (peek_at(l2, 1) == 47) {
+            {
+ token = mk_tok(TkOr, line, col), lexer = advance_n(l2, 2) }        } else {
+        if c == 60 {
+ {
+ token = mk_tok(TkLt, line, col), lexer = advance(l2) } } else {
+        if c == 62 {
+ {
+ token = mk_tok(TkGt, line, col), lexer = advance(l2) } } else {
+        if c == 61 {
+ {
+ token = mk_tok(TkEq, line, col), lexer = advance(l2) } } else {
+        if c == 124 {
+ {
+ token = mk_tok(TkPipe, line, col), lexer = advance(l2) } } else {
+        if c == 58 {
+ {
+ token = mk_tok(TkColon, line, col), lexer = advance(l2) } } else {
+        if c == 44 {
+ {
+ token = mk_tok(TkComma, line, col), lexer = advance(l2) } } else {
+        if c == 46 {
+ {
+ token = mk_tok(TkDot, line, col), lexer = advance(l2) } } else {
+        if c == 59 {
+ {
+ token = mk_tok(TkSemi, line, col), lexer = advance(l2) } } else {
+        if c == 64 {
+ {
+ token = mk_tok(TkAt, line, col), lexer = advance(l2) } } else {
+        if c == 123 {
+ {
+ token = mk_tok(TkLBrace, line, col), lexer = advance(l2) } } else {
+        if c == 125 {
+ {
+ token = mk_tok(TkRBrace, line, col), lexer = advance(l2) } } else {
+        if c == 40 {
+ {
+ token = mk_tok(TkLParen, line, col), lexer = advance(l2) } } else {
+        if c == 41 {
+ {
+ token = mk_tok(TkRParen, line, col), lexer = advance(l2) } } else {
+        if c == 91 {
+ {
+ token = mk_tok(TkLBrack, line, col), lexer = advance(l2) } } else {
+        if c == 93 {
+ {
+ token = mk_tok(TkRBrack, line, col), lexer = advance(l2) } } else {
+        if c == 43 {
+ {
+ token = mk_tok(TkPlus, line, col), lexer = advance(l2) } } else {
+        if c == 45 {
+ {
+ token = mk_tok(TkMinus, line, col), lexer = advance(l2) } } else {
+        if c == 42 {
+ {
+ token = mk_tok(TkStar, line, col), lexer = advance(l2) } } else {
+        if c == 47 {
+ {
+ token = mk_tok(TkSlash, line, col), lexer = advance(l2) } } else {
+        if c == 37 {
+ {
+ token = mk_tok(TkPercent, line, col), lexer = advance(l2) } } else {
+        {
+ token = mk_tok(TkEof, line, col), lexer = advance(l2) }        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}    }    fn tk_name(k : M1Tk) -> String {
+        match k {
+            TkEof -> "EOF";
+            TkInt -> "INT";
+            TkFloat -> "FLOAT";
+            TkString -> "STRING";
+            TkChar -> "CHAR";
+            TkIdent -> "IDENT";
+            TkArrow -> "ARROW";
+            TkLArrow -> "LARROW";
+            TkBidi -> "BIDI";
+            TkEq -> "EQ";
+            TkEqEq -> "EQEQ";
+            TkNeq -> "NEQ";
+            TkLt -> "LT";
+            TkGt -> "GT";
+            TkLe -> "LE";
+            TkGe -> "GE";
+            TkAnd -> "AND";
+            TkOr -> "OR";
+            TkPipe -> "PIPE";
+            TkColon -> "COLON";
+            TkComma -> "COMMA";
+            TkDot -> "DOT";
+            TkSemi -> "SEMI";
+            TkAt -> "AT";
+            TkLBrace -> "LBRACE";
+            TkRBrace -> "RBRACE";
+            TkLParen -> "LPAREN";
+            TkRParen -> "RPAREN";
+            TkLBrack -> "LBRACK";
+            TkRBrack -> "RBRACK";
+            TkPlus -> "PLUS";
+            TkMinus -> "MINUS";
+            TkStar -> "STAR";
+            TkSlash -> "SLASH";
+            TkPercent -> "PERCENT";
+            TkUnit -> "UNIT";
+            TkModule -> "MODULE";
+            TkType -> "TYPE";
+            TkFn -> "FN";
+            TkLet -> "LET";
+            TkMatch -> "MATCH";
+            TkIf -> "IF";
+            TkElse -> "ELSE";
+            TkTrue -> "TRUE";
+            TkFalse -> "FALSE";
+            TkExternal -> "EXTERNAL";
+            TkNot -> "NOT";
+            TkForall -> "FORALL";
+            TkExists -> "EXISTS";
+            TkMut -> "MUT";
+            TkWhile -> "WHILE";
+            TkFreeze -> "FREEZE";
+            TkNow -> "NOW";
+            TkWwas -> "WAS";
+            TkWhen -> "WHEN";
+            TkWill -> "WILL";
+            TkWorld -> "WORLD";
+            TkDo -> "DO";
+            TkSet -> "SET";
+            TkPick -> "PICK";
+            TkShape -> "SHAPE";
+            TkLive -> "LIVE";
+            TkSay -> "SAY";
+            TkShow -> "SHOW";
+            TkThen -> "THEN";
+        }    }    fn print_token_value(t : M1Token) -> Int {
+        match t.kind {
+            TkIdent -> let p1 : Int = m0_print(" ");
+ m0_print(t.str_val);
+            TkInt -> if m0_string_len(t.str_val) > 0 {
+                let p2 : Int = m0_print(" ");
+ m0_print(t.str_val)            } else {
+                let p3 : Int = m0_print(" ");
+ m0_print_int(t.int_val)            };
+            TkFloat -> let p4 : Int = m0_print(" ");
+ m0_print(t.str_val);
+            TkString -> let p5 : Int = m0_print(" ");
+ m0_print(t.str_val);
+            TkChar -> let p6 : Int = m0_print(" ");
+ m0_print_char(t.int_val);
+            _ -> 0;
+        }    }    fn print_tokens(l : M1Lexer) -> Int {
+        let r : M1LexResult = m1_lexer_next(l);
+        let p1 : Int = m0_print(tk_name(r.token.kind));
+        let p2 : Int = print_token_value(r.token);
+        let p3 : Int = m0_print("\n");
+        match r.token.kind {
+            TkEof -> 0;
+            _ -> print_tokens(r.lexer);
+        }    }    fn lexer_demo() -> Int {
+        let src : String = "module Test {\n    forall x : Int -> x\n    exists y : Bool /\\ y\n    Linear(Int)\n    [IO] Unit\n    x <-> y\n}";
+        print_tokens(m1_lexer_init(src))    }}

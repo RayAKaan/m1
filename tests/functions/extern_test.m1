@@ -1,0 +1,7 @@
+world Test {
+    external "m0_println" : String -> Int
+
+    do main() -> Int {
+        say("Hello")
+    }
+}

@@ -1,0 +1,78 @@
+module Stress {
+    external "printf" : String -> Int
+    external "putchar" : Int -> Int
+
+    type Option = | Some(Int) | None
+    type Pair = { first : Int, second : Int }
+
+    fn some_val() -> Option { Some(42) }
+    fn none_val() -> Option { None }
+
+    fn unwrap_or(o : Option, def : Int) -> Int {
+        match o {
+            Some(v) -> v;
+            None -> def;
+        }
+    }
+
+    fn fib(n : Int) -> Int {
+        if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+    }
+
+    fn fact(n : Int) -> Int {
+        if n < 1 { 1 } else { n * fact(n - 1) }
+    }
+
+    fn make_pair(a : Int, b : Int) -> Pair { { first = a, second = b } }
+
+    fn pair_sum(p : Pair) -> Int { p.first + p.second }
+
+    fn swap_pair(p : Pair) -> Pair { { first = p.second, second = p.first } }
+
+    fn gcd(a : Int, b : Int) -> Int {
+        if b == 0 { a } else { gcd(b, a - (a / b) * b) }
+    }
+
+    fn max(a : Int, b : Int) -> Int {
+        if a > b { a } else { b }
+    }
+
+    fn min(a : Int, b : Int) -> Int {
+        if a < b { a } else { b }
+    }
+
+    fn clamp(v : Int, lo : Int, hi : Int) -> Int {
+        max(lo, min(v, hi))
+    }
+
+    fn count_down(n : Int) -> Int {
+        if n == 0 { 0 } else { n + count_down(n - 1) }
+    }
+
+    fn power(base : Int, exp : Int) -> Int {
+        if exp == 0 { 1 } else { base * power(base, exp - 1) }
+    }
+
+    fn ack(m : Int, n : Int) -> Int {
+        if m == 0 { n + 1 }
+        else {
+            if n == 0 { ack(m - 1, 1) }
+            else { ack(m - 1, ack(m, n - 1)) }
+        }
+    }
+
+    fn main() -> Int {
+        let a : Int = fib(10);
+        let b : Int = fact(10);
+        let c : Int = unwrap_or(some_val(), 0);
+        let d : Int = unwrap_or(none_val(), 99);
+        let e : Int = gcd(48, 18);
+        let f : Int = power(2, 10);
+        let g : Int = clamp(15, 0, 10);
+        let h : Int = count_down(100);
+        let i : Int = pair_sum(make_pair(3, 7));
+        let j : Int = pair_sum(swap_pair(make_pair(3, 7)));
+        let k : Int = ack(3, 3);
+        a + b + c + d + e + f + g + h + i + j + k
+    }
+}

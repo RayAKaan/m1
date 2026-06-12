@@ -1,0 +1,13 @@
+module bank;
+
+do create_account(initial : Int) -> Int {
+    set live balance : Int = initial;
+    set _ : Int = now balance >= 0;
+    set _ : Int = when balance < 100 then { say("low balance") };
+    balance
+}
+
+do withdraw(balance : Int, amount : Int) -> Int {
+    set live b : Int = balance - amount;
+    b
+}

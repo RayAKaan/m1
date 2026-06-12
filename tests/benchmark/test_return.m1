@@ -1,0 +1,11 @@
+world ReturnTest {
+    do f(x : Int) -> Int {
+        if x < 0 { return 0; };
+        x + 1
+    }
+    do main() -> Int {
+        set _ : Int = say(int_to_string(f(5)));
+        set _ : Int = say(int_to_string(f(-3)));
+        0
+    }
+}

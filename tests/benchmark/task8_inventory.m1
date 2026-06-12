@@ -1,0 +1,13 @@
+world InventoryTest {
+    do main() -> Int {
+        set live stock : Int = 50;
+        set _ : Int = now stock >= 0;
+        set _ : Int = when stock < 10 then { say("reorder") };
+        set _ : Int = stock = 30;
+        set _ : Int = stock = 8;
+        set _ : Int = say(int_to_string(stock));
+        set _ : Int = stock = 20;
+        set _ : Int = say(int_to_string(stock));
+        0
+    }
+}

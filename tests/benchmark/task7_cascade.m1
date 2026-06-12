@@ -1,0 +1,11 @@
+world CascadeTest {
+    do main() -> Int {
+        set live a : Int = 0;
+        set live b : Int = 0;
+        set live c : Int = 0;
+        set _ : Int = when a == 1 then { b = 1 };
+        set _ : Int = when b == 1 then { c = 1 };
+        set _ : Int = a = 1;
+        say(int_to_string(c))
+    }
+}

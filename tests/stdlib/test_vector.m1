@@ -1,0 +1,26 @@
+module main;
+import std.vector;
+
+do main() -> Int {
+    let live v : Vector = std.vector.new();
+
+    push(v, 10);
+    push(v, 20);
+    push(v, 30);
+    push(v, 40);
+    push(v, 50);
+
+    say(int_to_string(std.vector.length(v)));
+    say(int_to_string(std.vector.get(v, 2)));
+    say(int_to_string(std.vector.contains(v, 30)));
+    say(int_to_string(std.vector.contains(v, 99)));
+    say(int_to_string(std.vector.index_of(v, 40)));
+    say(int_to_string(std.vector.sum(v)));
+    say(int_to_string(std.vector.max(v)));
+    say(int_to_string(std.vector.min(v)));
+
+    reverse(v);
+    say(std.vector.to_string(v));
+
+    0
+}

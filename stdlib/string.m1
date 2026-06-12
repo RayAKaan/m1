@@ -1,0 +1,77 @@
+module std.string;
+
+-- External C runtime bindings (curried arrow syntax for parser compat)
+external "m0_string_concat" : String -> String -> String;
+external "m0_string_length" : String -> Int;
+external "m0_string_substr" : String -> Int -> Int -> String;
+external "m0_string_eq"     : String -> String -> Int;
+external "m0_string_to_int" : String -> Int;
+external "m0_int_to_string" : Int -> String;
+external "m0_string_char_at" : String -> Int -> Int;
+external "m0_string_to_lower" : String -> String;
+external "m0_string_to_upper" : String -> String;
+
+-- Core operations
+
+do concat(a : String, b : String) -> String {
+    m0_string_concat(a, b)
+}
+
+do length(s : String) -> Int {
+    m0_string_length(s)
+}
+
+do substr(s : String, start : Int, len : Int) -> String {
+    m0_string_substr(s, start, len)
+}
+
+do equals(a : String, b : String) -> Int {
+    m0_string_eq(a, b)
+}
+
+do char_at(s : String, idx : Int) -> Int {
+    m0_string_char_at(s, idx)
+}
+
+do to_lower(s : String) -> String {
+    m0_string_to_lower(s)
+}
+
+do to_upper(s : String) -> String {
+    m0_string_to_upper(s)
+}
+
+-- Derived operations
+
+do starts_with(s : String, prefix : String) -> Int {
+    if length(s) < length(prefix) { 0 } else { equals(substr(s, 0, length(prefix)), prefix) }
+}
+
+do ends_with(s : String, suffix : String) -> Int {
+    if length(s) < length(suffix) { 0 } else { equals(substr(s, length(s) - length(suffix), length(suffix)), suffix) }
+}
+
+do contains_loop(s : String, sub : String, i : Int) -> Int {
+    if i > length(s) - length(sub) { 0 } else {
+        if equals(substr(s, i, length(sub)), sub) == 1 { 1 } else {
+            contains_loop(s, sub, i + 1)
+        }
+    }
+}
+
+do contains(s : String, sub : String) -> Int {
+    if length(sub) == 0 { 1 } else {
+        if length(s) < length(sub) { 0 } else {
+            contains_loop(s, sub, 0)
+        }
+    }
+}
+
+do to_int(s : String) -> Int {
+    m0_string_to_int(s)
+}
+
+do from_int(i : Int) -> String {
+    m0_int_to_string(i)
+}
+

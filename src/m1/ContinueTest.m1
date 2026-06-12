@@ -1,0 +1,6 @@
+world ContinueTest {
+    do main() -> Int {
+        while 1 { continue; 0 };
+        0
+    }
+}

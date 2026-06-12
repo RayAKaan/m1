@@ -1,0 +1,15 @@
+world StringsTest {
+    do main() -> Int {
+        set s : String = "Hello, World";
+        set _ : Int = say(int_to_string(char_at(s, 0)));
+        set _ : Int = say(substring(s, 7, 5));
+        set parts : Int = string_split("10 20 30", " ");
+        set live i : Int = 0;
+        set live sum : Int = 0;
+        set _ : Int = while i < vector_len(parts) {
+            set _ : Int = (sum = sum + string_to_int(vector_get_str(parts, i)));
+            i = i + 1
+        };
+        say(int_to_string(sum))
+    }
+}

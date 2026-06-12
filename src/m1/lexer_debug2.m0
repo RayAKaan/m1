@@ -1,0 +1,37 @@
+module M1Lexer {
+    external "m0_char_at" : String -> Int -> Int
+    external "m0_substr" : String -> Int -> Int -> String
+    external "m0_string_eq" : String -> String -> Int
+    external "m0_string_len" : String -> Int
+    external "m0_print" : String -> Int
+    external "m0_print_int" : Int -> Int
+
+    type M1Tk = | TkEof | TkInt | TkFloat | TkString | TkChar | TkIdent
+               | TkArrow | TkLArrow | TkBidi | TkEq | TkEqEq | TkNeq
+               | TkLt | TkGt | TkLe | TkGe
+               | TkAnd | TkOr | TkPipe | TkColon | TkComma | TkDot | TkSemi | TkAt
+               | TkLBrace | TkRBrace | TkLParen | TkRParen | TkLBrack | TkRBrack
+               | TkPlus | TkMinus | TkStar | TkSlash | TkPercent | TkUnit
+               | TkModule | TkType | TkFn | TkLet | TkMatch | TkIf | TkElse
+               | TkTrue | TkFalse | TkExternal | TkNot
+               | TkForall | TkExists
+               | TkLinear | TkAffine | TkPersistent | TkEventual
+
+    type M1Token = { kind : M1Tk, line : Int, col : Int, int_val : Int, str_val : String }
+    type M1Lexer = { src : String, pos : Int, line : Int, col : Int }
+    type M1LexResult = { token : M1Token, lexer : M1Lexer }
+
+    fn mk_tok(k : M1Tk) -> M1Token { { kind = k, line = 0, col = 0, int_val = 0, str_val = "" } }
+
+    fn keyword_or_ident(s : String, line : Int, col : Int) -> M1Token {
+        if m0_string_eq(s, "module") == 1 { mk_tok(TkModule) } else
+        { mk_str_tok(TkIdent, s, line, col) }
+    }
+
+    fn parse_int_rec(s : String, i : Int, len : Int, acc : Int) -> Int {
+        if i >= len { acc } else {
+            let c : Int = m0_char_at(s, i);
+            parse_int_rec(s, i + 1, len, acc * 10 + (c - 48))
+        }
+    }
+}

@@ -1,0 +1,8 @@
+world FloatTest {
+    do main() -> Int {
+        set pi : Int = float_div(float_of_int(314), float_of_int(100));
+        set r : Int = float_of_int(5);
+        set area : Int = float_mul(pi, float_mul(r, r));
+        say(float_to_string(area))
+    }
+}

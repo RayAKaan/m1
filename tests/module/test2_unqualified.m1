@@ -1,0 +1,7 @@
+module main;
+import lib;
+
+do main() -> Int {
+    greet("world");
+    0
+}

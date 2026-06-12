@@ -1,0 +1,15 @@
+world ReturnEdge {
+    do f(x : Int) -> Int {
+        while x > 0 {
+            if x == 3 { return 99; };
+            set _ : Int = x = x - 1;
+        };
+        1
+    }
+
+    do main() -> Int {
+        set _ : Int = say(int_to_string(f(5)));
+        set _ : Int = say(int_to_string(f(2)));
+        0
+    }
+}

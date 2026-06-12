@@ -1,0 +1,16 @@
+world VectorTest {
+    do main() -> Int {
+        set live v : Int = vector_new();
+        set live i : Int = 0;
+        set _ : Int = while i < 5 {
+            set _ : Int = vector_push(v, i * 10);
+            i = i + 1
+        };
+        set live j : Int = 0;
+        set _ : Int = while j < vector_len(v) {
+            set _ : Int = say(int_to_string(vector_get(v, j)));
+            j = j + 1
+        };
+        0
+    }
+}
