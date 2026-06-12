@@ -27,6 +27,12 @@ out.txt
 *stdout*.txt
 tests/debug_logs/
 
+# ===== Injected test sources (generated at test time) =====
+src/m1/_inj_*.m1
+
+# ===== Stderr capture files =====
+*.stderr
+
 # ===== Test runner scratch =====
 tests/build/*
 !tests/build/run_tests.ps1
