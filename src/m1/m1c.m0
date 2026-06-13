@@ -1070,34 +1070,29 @@ module M1C {
         } else {
         if k == N_LIVE {
             let nm : String = m0_load_string(e, 3);
-            let _p0 : Int = m0_print("/* live "); let _p1 : Int = m0_print(nm); let _p2 : Int = m0_print(" */ ");
-            let _p3 : Int = emit_c_expr(reg, m0_get(e, 5));
-            let _x : Int = m0_print("")
+            let _r : Int = pg_record(nm, "live");
+            let _v : Int = emit_c_expr(reg, m0_get(e, 5))
         } else {
         if k == N_FREEZE {
             let nm : String = m0_load_string(e, 3);
-            let _p0 : Int = m0_print("/* freeze "); let _p1 : Int = m0_print(nm); m0_print(" */ 0")
+            let _r : Int = pg_freeze(nm);
+            m0_print("0")
         } else {
         if k == N_WAS {
             let var_e : Int = m0_get(e, 3);
             let ph : String = m0_load_string(e, 4);
             let vn : String = m0_load_string(var_e, 3);
             let res : Int = pg_query(vn, ph);
-            let _p : Int = m0_print(if res == 1 { "1" } else { if res == 0 { "0" } else { "0" } });
-            let _q : Int = m0_print("")
+            m0_print(if res == 1 { "1" } else { "0" })
         } else {
         if k == N_WILL {
-            let _p0 : Int = m0_print("/* will */ (");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
-            m0_print(")")
+            let _p : Int = emit_c_expr(reg, m0_get(e, 3))
         } else {
         if k == N_NOW {
-            let _p0 : Int = m0_print("/* now */ (");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
-            m0_print(")")
+            let _p : Int = emit_c_expr(reg, m0_get(e, 3))
         } else {
         if k == N_WHEN {
-            let _p0 : Int = m0_print("/* when */ (");
+            let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(" ? ");
             let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
