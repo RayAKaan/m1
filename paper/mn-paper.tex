@@ -147,13 +147,13 @@ operators: \texttt{freeze} prevents mutation past a program point~($\square$), \
 asserts immediate state invariants, \texttt{was} queries variable phase history~($\ominus$),
 \texttt{when/then} provides conditional state triggers~($\leadsto$), and \texttt{will} commits
 to future state conditions~($\Diamond$). A bootstrapped two-tier compiler toolchain translates
-Mn to C: a 4,923-line C frontend~(M0) compiles the self-hosted compiler~(M1), which emits C
+Mn to C: a 5,222-line C frontend~(M0) compiles the self-hosted compiler~(M1), which emits C
 code with integrated runtime temporal checks. The key contribution is the \emph{Phase Graph},
 a compile-time structure tracking variable state transitions that enables static constant-folding
 of temporal queries. We demonstrate on five canonical temporal bugs that Mn catches violations
 that existing tools---including Rust's borrow checker, JavaMOP runtime monitors, and TLA+
-specifications---miss. The M1 compiler comprises 6,848 lines of M0 source and passes
-46~of~73~test programs, including all 13 temporal-operator tests.
+specifications---miss. The M1 compiler comprises 7,362 lines of M0 source and passes
+46~of~79~test programs, including all 13 temporal-operator tests.
 \end{abstract}
 
 \bigskip
@@ -255,8 +255,8 @@ The paper makes the following claims:
     overhead (\cref{sec:keywords}).
   \item The Phase Graph enables compile-time constant-folding of temporal queries, converting
     runtime history checks into static literals (\cref{sec:phasegraph}).
-  \item A bootstrapped two-tier compiler of 6,848 lines of M0 source generates C code with
-    integrated runtime temporal monitors, passing 46 of 73 test programs, including all 13 temporal-operator tests (\cref{sec:impl}).
+  \item A bootstrapped two-tier compiler of 7,362 lines of M0 source generates C code with
+    integrated runtime temporal monitors, passing 46 of 79 test programs, including all 13 temporal-operator tests (\cref{sec:impl}).
   \item Mn catches all five canonical bugs at compile time or with efficient runtime checks,
     where existing tools require manual specification or separate model checking
     (\cref{sec:casestudies}).
@@ -590,11 +590,11 @@ phase-history scan.
 The Mn toolchain is a bootstrapped two-tier system:
 
 \begin{itemize}[leftmargin=*,itemsep=2pt]
-  \item \textbf{M0 (the bootstrap):} 4,923 lines of C implementing a subset of Mn without
+  \item \textbf{M0 (the bootstrap):} 5,222 lines of C implementing a subset of Mn without
     temporal keywords.
-  \item \textbf{M1 (the generated compiler):} 6,848 lines of M0 source (15 files) implementing
+  \item \textbf{M1 (the generated compiler):} 7,362 lines of M0 source (26 files) implementing
     the full Mn language. M0 compiles M1's source to produce the \texttt{m1c} binary.
-  \item \textbf{Runtime library:} 512 lines of C providing memory management, string
+  \item \textbf{Runtime library:} 803 lines of C providing memory management, string
     operations, the phase-history arrays, freeze tracking, and the trigger/invariant/commitment
     runtime systems.
 \end{itemize}
@@ -621,12 +621,12 @@ The Mn toolchain is a bootstrapped two-tier system:
 \toprule
 \textbf{Component} & \textbf{Language} & \textbf{Files} & \textbf{Lines}\\
 \midrule
-M0 bootstrap compiler    & C  & 23 & 4,923\\
-Runtime library          & C  &  1 &   512\\
-M1 self-hosted compiler  & M0 & 15 & 6,848\\
+M0 bootstrap compiler    & C  & 45 & 5,222\\
+Runtime library          & C  &  3 &   803\\
+M1 self-hosted compiler  & M0 & 26 & 7,362\\
 M1 generated C output    & C  &  1 & 3,273\\
-Phase Graph module       & C  &  2 &   420\\
-Test programs            & Mn & 73 &   747\\
+Phase Graph module       & C  &  2 &   427\\
+Test programs            & Mn & 79 & 5,771\\
 \midrule
 \textbf{Total (excluding tests)} & & & \textbf{15,956}\\
 \bottomrule
@@ -655,7 +655,7 @@ Test programs            & Mn & 73 &   747\\
 
 \subsection{Test Suite}
 
-The Mn test suite comprises 73 programs across seven categories:
+The Mn test suite comprises 79 programs across seven categories:
 temporal operators (\texttt{freeze}, \texttt{now}, \texttt{was},
 \texttt{when}, \texttt{will}), benchmarks, algorithms, data structures,
 standard library, functions, and floating-point arithmetic.
@@ -947,7 +947,7 @@ five keywords---\texttt{freeze}, \texttt{now}, \texttt{was}, \texttt{when/then},
 \texttt{will}---enable programmers to express temporal constraints directly in their code,
 without separate specifications or model checkers. The Phase Graph converts runtime history
 scans into static constant-folded literals for bounded code paths. A bootstrapped two-tier
-compiler of 6,848 lines of M0 source demonstrates the approach is practical, and 46 of 73 test
+compiler of 7,362 lines of M0 source demonstrates the approach is practical, and 46 of 79 test
 programs validate correctness across five canonical temporal bug patterns.
 
 \subsection{The Mn Tower}
@@ -956,8 +956,8 @@ Mn is the first instance of a family $\mathcal{M}_n$ of temporal verification la
 arbitrary depth, where each level adds verification power the previous level cannot express:
 
 \begin{itemize}[leftmargin=*,itemsep=2pt]
-  \item \textbf{M0} (complete): Bootstrap compiler in C. 4,923 lines.
-  \item \textbf{M1} (complete): Self-hosted compiler with five temporal keywords. 6,848 lines
+  \item \textbf{M0} (complete): Bootstrap compiler in C. 5,222 lines.
+  \item \textbf{M1} (complete): Self-hosted compiler with five temporal keywords. 7,362 lines
     of M0 source.
   \item \textbf{M2} (planned): Phase Graph extended to interprocedural analysis; effect types
     for I/O; self-verifying compiler.

@@ -15,7 +15,7 @@ permanent, committed record of the research results.
 
 ## Provenance
 
-- **Commit hash**: `4e13ebd86317324c6d3f2e0617ca5565a6d820f0`
+- **Commit hash**: `519bcac179f4128a984a40b164bec3fb4aaea956`
 - **Tag**: `paper-evidence` (points to the pre-cleanup snapshot)
 - **Date**: June 12, 2026
 - **Compiler**: `m1c.exe` (308KB, June 5, 2026)
@@ -38,3 +38,21 @@ that were present before cleanup are preserved forever in the `pre-cleanup` and
 These files are a **historical snapshot** backing specific paper claims. Fresh
 test runs produce new output in `build/`; do not overwrite this directory.
 If the paper is updated, add new files alongside these originals.
+
+## Provenance & Layout Note (added 2026-06-13)
+
+The `paper-evidence` tag (`519bcac179f4128a984a40b164bec3fb4aaea956`) captures the
+pre-cleanup state. At the time of that tag:
+
+- Evidence files (`catalog.md`, `inventory.md`, `test-results.md`, `codegen-patterns.md`, `README.md`)
+  lived at the repository **root**.
+- Later cleanup commit `7cd3374` moved the evidence into `paper/evidence/`.
+- Current `HEAD` (and the `paper/evidence/` directory) reflects the post-cleanup
+  canonical layout used for ongoing development.
+- When checking out the tag (`git checkout paper-evidence`), look for the evidence
+  files at the root of the working tree, not inside `paper/evidence/`.
+
+The hash and tag above now match (`git rev-parse paper-evidence`).
+
+This README is maintained at HEAD and describes both the frozen snapshot and the
+current location.

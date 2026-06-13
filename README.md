@@ -1,3 +1,5 @@
+[![Tests](https://github.com/RayAKaan/m1/actions/workflows/test.yml/badge.svg)](https://github.com/RayAKaan/m1/actions/workflows/test.yml)
+
 # M1 — A Language Where Time Is a Type
 
 M1 is a programming language with temporal logic built into the syntax. Five
@@ -189,18 +191,15 @@ paper/        Research paper + frozen evidence (paper/evidence/)
 **Bootstrap chain:** `m0c.exe` (C) compiles `.m0` → `m1c.exe` (M0) compiles `.m1`
 to C → clang links against `m0_runtime.c` → final executable.
 
-## Status
+## Known Limitations (v0.5)
 
-**v0.5** — actively developed. 13/13 temporal-operator tests pass; 46/73 overall
-([full results](paper/evidence/test-results.md)). Every paper claim maps to a
-committed artifact in `paper/evidence/`, frozen at tag `paper-evidence`.
+**Self-hosting is incomplete.**  
+The golden `m1c.exe` binary (the one used for all evidence) cannot recompile its own source (`src/m1/m1c.m0`, ~1,098 lines). It crashes with stack overflow. M0 successfully bootstraps the first m1c, but full self-hosting is M2 work.
 
-## What's Next
+**Phase Graph is a standalone prototype.**  
+The Phase Graph (the paper's central technical contribution for compile-time `was` folding) exists as `src/m1/phase_graph.c` + `phase_graph.h`. It is **not yet integrated** into the self-hosted `m1c.m0` compiler. The golden test outputs in the evidence demonstrate the *target* behavior; the current m1c.exe does not perform the static folding itself.
 
-- Linear types
-- Effect types
-- Proposition verification (`m1 verify`)
-- CI running the full suite on every push
+Full details and the 5 documented codegen gaps are in `paper/evidence/test-results.md`.
 
 ## License
 

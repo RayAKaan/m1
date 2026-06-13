@@ -1,0 +1,49 @@
+name: M1 Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup clang (via LLVM)
+        uses: llvm/actions/install-llvm@latest
+        with:
+          version: 18
+          directory: C:\Program Files\LLVM
+
+      - name: Add LLVM to PATH
+        run: echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+
+      - name: Verify clang
+        run: clang --version
+
+      - name: Run M1 test suite
+        working-directory: tests/build
+        run: |
+          powershell -ExecutionPolicy Bypass -File run_tests.ps1 `
+            -M1cPath "../../src/m1/m1c.exe" `
+            -M0RuntimeObj "../../src/m1/m0_runtime_core.obj" `
+            -InjectPy "../../src/m1/inject_test.py" `
+            -TestRoot "../../tests" `
+            -WorkDir "../../src/m1" `
+            || exit 1
+
+      - name: Upload generated artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            src/m1/_test_*.*
+            src/m1/_inj_*.m1
+          retention-days: 7
