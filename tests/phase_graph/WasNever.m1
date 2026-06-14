@@ -1,0 +1,9 @@
+module WasNever {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 42;
+        let _ : Int = freeze x;
+        m0_print_int(was x.Used)
+    }
+}

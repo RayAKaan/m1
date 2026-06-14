@@ -16,13 +16,13 @@ module M1C {
     external "m0_list_length" : Int -> Int
     external "m0_get_env" : String -> String
 
-    external "phase_graph_init" : () -> Int
+    external "phase_graph_init" : Unit -> Int
     external "phase_graph_record" : String -> String -> Int
     external "phase_graph_freeze" : String -> Int
     external "phase_graph_query" : String -> String -> Int
     external "phase_graph_will_check" : String -> String -> Int
 
-    fn pg_init() -> Int { phase_graph_init() }
+    fn pg_init() -> Int { phase_graph_init(()) }
     fn pg_record(v : String, p : String) -> Int { phase_graph_record(v, p) }
     fn pg_freeze(v : String) -> Int { phase_graph_freeze(v) }
     fn pg_query(v : String, p : String) -> Int { phase_graph_query(v, p) }
@@ -82,13 +82,16 @@ module M1C {
     let TK_EXISTS : Int = 48
     let TK_MUT : Int = 49
     let TK_WHILE : Int = 50
-    let TK_LIVE : Int = 51
-    let TK_FREEZE : Int = 52
+    -- NOTE: these MUST match the M1Tk enum order in src/m1/lexer.c (the linked
+    -- lexer). They were previously misaligned (live/freeze/now/then) which made
+    -- temporal forms unparseable in the self-hosted path. Aligned 2026-06-14.
+    let TK_FREEZE : Int = 51
+    let TK_NOW : Int = 52
     let TK_WWAS : Int = 53
     let TK_WHEN : Int = 54
     let TK_WILL : Int = 55
-    let TK_NOW : Int = 56
-    let TK_THEN : Int = 57
+    let TK_LIVE : Int = 61
+    let TK_THEN : Int = 64
 
     let N_PROG : Int = 0
     let N_MOD : Int = 1
@@ -105,6 +108,7 @@ module M1C {
     let N_NOT : Int = 12
     let N_FIELD : Int = 13
     let N_CALL : Int = 14
+    let N_SEQ : Int = 15
     let N_LET : Int = 16
     let N_LAMBDA : Int = 17
     let N_MATCH : Int = 18
@@ -119,6 +123,7 @@ module M1C {
     let N_WILL : Int = 27
     let N_NOW : Int = 28
     let N_WHEN : Int = 29
+    let N_FOR : Int = 30
 
     let T_NAMED : Int = 100
     let T_FN : Int = 101
@@ -255,11 +260,12 @@ module M1C {
         let s1 : Int = m0_set(n, 4, body);
         n
     }
-    fn n_live(nm : String, ty : Int, val : Int, line : Int, col : Int) -> Int {
+    fn n_live(nm : String, ty : Int, val : Int, body : Int, line : Int, col : Int) -> Int {
         let n : Int = nk(N_LIVE, line, col, 7);
         let s0 : Int = m0_store_string(n, 3, nm);
         let s1 : Int = m0_set(n, 4, ty);
         let s2 : Int = m0_set(n, 5, val);
+        let s3 : Int = m0_set(n, 6, body);
         n
     }
     fn n_freeze(nm : String, line : Int, col : Int) -> Int {
@@ -432,13 +438,16 @@ module M1C {
         let k : Int = ps_kind(s);
         let line : Int = ps_line(s);
         let col : Int = ps_col(s);
+        -- The lexer emits TK_INT for the type name "Int" (deliberate hack),
+        -- so accept it here as a named type as well as TK_IDENT.
+        if k == TK_INT { mk_pr(t_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_IDENT { mk_pr(t_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_LBRACE { gather_type_fields(ps_adv(s), m0_nil, line, col) } else {
         if k == TK_PIPE { gather_ctors(ps_adv(s), m0_nil, line, col) } else {
         if k == TK_LPAREN {
             let r : PR = parse_type_expr(ps_adv(s));
             mk_pr(r.node, ps_adv(r.st))
-        } else { mk_pr(n_unit(line, col), ps_err(s)) }}}}
+        } else { mk_pr(n_unit(line, col), ps_err(s)) }}}}}
     }
 
     fn parse_type_app_ga(base_node : Int, s : PS, acc : Int, line : Int, col : Int) -> PR {
@@ -660,8 +669,11 @@ module M1C {
         if k == TK_IDENT { mk_pr(n_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_LET {
             let s_after_let : PS = ps_adv(s);
+            -- `let live x : T = v` declares a live (Phase-Graph-tracked) binding.
+            let is_live : Int = if ps_kind(s_after_let) == TK_LIVE { 1 } else { 0 };
             let is_mut : Int = if m0_string_eq(ps_str(s_after_let), "mut") == 1 { 1 } else { 0 };
-            let nm_ps : PS = if is_mut == 1 { ps_adv(s_after_let) } else { s_after_let };
+            let nm_ps : PS = if is_live == 1 { ps_adv(s_after_let) } else {
+                              if is_mut == 1 { ps_adv(s_after_let) } else { s_after_let } };
             let nm : String = ps_str(nm_ps);
             let s_after_name : PS = ps_adv(nm_ps);
             let s_after_colon : PS = ps_adv(s_after_name);
@@ -670,7 +682,11 @@ module M1C {
             let vr : PR = parse_expr(s_after_type);
             let s_after_val : PS = ps_adv(vr.st);
             let br : PR = parse_expr(s_after_val);
-            mk_pr(n_let(nm, tr.node, vr.node, br.node, line, col), br.st)
+            if is_live == 1 {
+                mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
+            } else {
+                mk_pr(n_let(nm, tr.node, vr.node, br.node, line, col), br.st)
+            }
         } else {
         if k == TK_MATCH {
             let sr : PR = parse_expr(ps_adv(s));
@@ -698,13 +714,15 @@ module M1C {
         } else {
         if k == TK_FREEZE {
             let nm : String = ps_str(ps_adv(s));
-            mk_pr(n_freeze(nm, line, col), ps_adv(s))
+            -- advance past both 'freeze' and the variable name
+            mk_pr(n_freeze(nm, line, col), ps_adv(ps_adv(s)))
         } else {
         if k == TK_WWAS {
             let vr : PR = parse_atom(ps_adv(s));
-            let sdot : PS = ps_adv(vr.st);
-            let ph : String = ps_str(ps_adv(sdot));
-            mk_pr(n_was(vr.node, ph, line, col), ps_adv(sdot))
+            -- vr.st points at '.', skip it to reach the phase name
+            let s_phase : PS = ps_adv(vr.st);
+            let ph : String = ps_str(s_phase);
+            mk_pr(n_was(vr.node, ph, line, col), ps_adv(s_phase))
         } else {
         if k == TK_WILL {
             let cr : PR = parse_expr(ps_adv(s));
@@ -721,12 +739,16 @@ module M1C {
             mk_pr(n_when(cr.node, br.node, line, col), br.st)
         } else {
         if k == TK_LIVE {
-            let nm : String = ps_str(ps_adv(s));
-            let s2 : PS = ps_adv(ps_adv(s));
-            let tr : PR = parse_type_expr(s2);
-            let s3 : PS = ps_adv(tr.st);
-            let vr : PR = parse_expr(s3);
-            mk_pr(n_live(nm, tr.node, vr.node, line, col), vr.st)
+            let s_after_live : PS = ps_adv(s);
+            let nm : String = ps_str(s_after_live);
+            let s_after_name : PS = ps_adv(s_after_live);
+            let s_after_colon : PS = ps_adv(s_after_name);
+            let tr : PR = parse_type_expr(s_after_colon);
+            let s_after_type : PS = ps_adv(tr.st);
+            let vr : PR = parse_expr(s_after_type);
+            let s_after_val : PS = ps_adv(vr.st);
+            let br : PR = parse_expr(s_after_val);
+            mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
         } else {
         if k == TK_LBRACE { gather_field_inits(ps_adv(s), m0_nil) } else {
         if k == TK_LBRACK { gather_list_elems(ps_adv(s), m0_nil) } else {
@@ -735,7 +757,7 @@ module M1C {
             mk_pr(r.node, ps_adv(r.st))
         } else {
             mk_pr(n_unit(line, col), ps_err(s))
-        }}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}
     }
 
     fn parse_decl(s : PS) -> PR {
@@ -760,7 +782,8 @@ module M1C {
         } else {
         if k == TK_EXTERNAL {
             let cn : String = ps_str(ps_adv(s));
-            let s2 : PS = ps_adv(ps_adv(s));
+            -- skip 'external', the name string, and the ':'
+            let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_extern(cn, tr.node, line, col), tr.st)
         } else {
@@ -780,7 +803,8 @@ module M1C {
         let line : Int = ps_line(s);
         let col : Int = ps_col(s);
         let nm : String = ps_str(ps_adv(s));
-        let s2 : PS = ps_adv(ps_adv(s));
+        -- skip 'module', the module name, and the opening '{'
+        let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
         let dr : PR = gather_decls(s2, m0_nil);
         mk_pr(n_mod(nm, dr.node, list_len(dr.node), line, col), dr.st)
     }
@@ -980,6 +1004,16 @@ module M1C {
         }
     }
 
+    -- Extract a simple variable name from an expression node.
+    -- Handles N_NAME (the var itself) and N_FIELD (the base of x.Phase).
+    -- Returns "" when the target is not a simple name (caller must fall back).
+    fn extract_var_name(node : Int) -> String {
+        let k : Int = m0_get(node, 0);
+        if k == N_NAME { m0_load_string(node, 3) } else {
+        if k == N_FIELD { extract_var_name(m0_get(node, 3)) } else {
+        "" }}
+    }
+
     fn emit_c_expr(reg : Int, e : Int) -> Int {
         let k : Int = m0_get(e, 0);
         if k == N_INT { m0_print_int(m0_get(e, 3)) } else {
@@ -1062,16 +1096,36 @@ module M1C {
             m0_print("; } 0; })")
         } else {
         if k == N_ASSIGN {
+            let nm : String = m0_load_string(e, 3);
+            let rhs : Int = m0_get(e, 4);
+            -- Record a phase transition for this var in the Phase Graph so that
+            -- a later `was x.<phase>` can be answered. We record a generic
+            -- "set" phase (value-named phases would need int->string support
+            -- in the self-hosted runtime, which is not yet available).
+            let _pg : Int = pg_record(nm, "set");
             let _p0 : Int = m0_print("(");
-            let _p1 : Int = m0_print(m0_load_string(e, 3));
+            let _p1 : Int = m0_print(nm);
             let _p2 : Int = m0_print(" = ");
-            let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+            let _p3 : Int = emit_c_expr(reg, rhs);
             m0_print(")")
         } else {
         if k == N_LIVE {
             let nm : String = m0_load_string(e, 3);
-            let _r : Int = pg_record(nm, "live");
-            let _v : Int = emit_c_expr(reg, m0_get(e, 5))
+            -- Record the lowercase "live" phase (special: "ever assigned")
+            -- and a capitalized "Live" phase (the initial declared phase).
+            -- "Live" is a normal identifier and so is queryable via
+            -- `was x.Live`; the keyword `live` cannot be used after `.`.
+            let _r0 : Int = pg_record(nm, "live");
+            let _r1 : Int = pg_record(nm, "Live");
+            let _p0 : Int = m0_print("({ ");
+            let _p1 : Int = emit_c_type(reg, m0_get(e, 4));
+            let _p2 : Int = m0_print(" ");
+            let _p3 : Int = m0_print(nm);
+            let _p4 : Int = m0_print(" = ");
+            let _p5 : Int = emit_c_expr(reg, m0_get(e, 5));
+            let _p6 : Int = m0_print("; ");
+            let _p7 : Int = emit_c_expr(reg, m0_get(e, 6));
+            m0_print("; })")
         } else {
         if k == N_FREEZE {
             let nm : String = m0_load_string(e, 3);
@@ -1081,15 +1135,36 @@ module M1C {
         if k == N_WAS {
             let var_e : Int = m0_get(e, 3);
             let ph : String = m0_load_string(e, 4);
-            let vn : String = m0_load_string(var_e, 3);
+            let vn : String = extract_var_name(var_e);
             let res : Int = pg_query(vn, ph);
-            m0_print(if res == 1 { "1" } else { "0" })
+            -- pg_query returns 1 (statically true), 0 (statically false),
+            -- or -1 (undecidable at compile time). Fold 0/1 to a C literal;
+            -- on -1 fall back to a runtime phase_graph_query() call so the
+            -- answer is still correct, just not folded.
+            if res == 1 { m0_print("1") } else {
+            if res == 0 { m0_print("0") } else {
+                let _q0 : Int = m0_print("phase_graph_query(\"");
+                let _q1 : Int = m0_print(vn);
+                let _q2 : Int = m0_print("\", \"");
+                let _q3 : Int = m0_print(ph);
+                m0_print("\")")
+            }}
         } else {
         if k == N_WILL {
-            let _p : Int = emit_c_expr(reg, m0_get(e, 3))
+            -- will C : evaluate the commitment condition. (Full commitment
+            -- tracking + return guard is Week 2 work.) Wrapped so the let has
+            -- a body expression, which the bootstrap m0c parser requires.
+            let _p0 : Int = m0_print("(");
+            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            m0_print(")")
         } else {
         if k == N_NOW {
-            let _p : Int = emit_c_expr(reg, m0_get(e, 3))
+            -- now C : emit a runtime invariant assertion. (Re-check after every
+            -- mutation is Week 2 work.) Wrapped so the let has a body.
+            let _p0 : Int = m0_print("({ if (!(");
+            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
+            0
         } else {
         if k == N_WHEN {
             let _p0 : Int = m0_print("(");
@@ -1099,7 +1174,7 @@ module M1C {
             m0_print(" : 0)")
         } else {
             m0_print("0")
-        }}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}
     }
 
     fn emit_c_params(reg : Int, params : Int) -> Int {
@@ -1153,6 +1228,9 @@ module M1C {
         let _p2 : Int = m0_print(nm);
         let _p3 : Int = m0_print("(");
         let _p4 : Int = if is_main == 1 { m0_print("void") } else { emit_fn_ep(reg, params, 1) };
+        -- Reset the compile-time Phase Graph before walking this function body.
+        -- Phase state (live/freeze/was) is tracked per-function during emit.
+        let _pg : Int = pg_init();
         let _p5 : Int = m0_print(") {\n  return ");
         let _p6 : Int = emit_c_expr(reg, body);
         m0_print(";\n}\n")
@@ -1185,7 +1263,10 @@ module M1C {
     fn emit_module(m : Int) -> Int {
         let decls : Int = m0_get(m, 4);
         let reg : Int = build_reg(decls, m0_nil);
-        let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n\n");
+        let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
+        -- Prototype for the Phase Graph runtime query, used by `was` when the
+        -- result is undecidable at compile time (pg_query returned -1).
+        let _hq : Int = m0_print("extern int phase_graph_query(const char*, const char*);\n\n");
         let _p1 : Int = emit_module_pass1(reg, decls);
         let _n1 : Int = m0_print("\n");
         let _p2 : Int = emit_module_pass2(reg, decls);

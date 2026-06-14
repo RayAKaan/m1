@@ -1,0 +1,9 @@
+module WasBasic {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live token : Int = 0;
+        let _ : Int = m0_print_int(was token.Live);
+        0
+    }
+}
