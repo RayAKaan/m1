@@ -7,6 +7,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* Cross-platform shim (defines _strdup/strncpy_s on non-Windows). Included
+   directly so the runtime builds even when compiled without -include compat.h. */
+#if defined(__has_include)
+#  if __has_include("compat.h")
+#    include "compat.h"
+#  endif
+#endif
+
 int64_t m0_char_at(const char* s, int64_t i) {
     if (!s || i < 0 || i >= (int64_t)strlen(s)) return -1;
     return (int64_t)(unsigned char)s[i];

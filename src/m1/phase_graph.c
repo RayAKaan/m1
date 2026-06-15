@@ -4,6 +4,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* Cross-platform shim (defines strncpy_s/_TRUNCATE/_strdup on non-Windows).
+   Included directly so it builds even without -include compat.h. */
+#if defined(__has_include)
+#  if __has_include("compat.h")
+#    include "compat.h"
+#  endif
+#endif
+
 /* -------------------------------------------------------------------
  * AST node kinds (mirrors m1c_out_raw.c definitions)
  * ------------------------------------------------------------------ */
