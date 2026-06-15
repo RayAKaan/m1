@@ -1,0 +1,6 @@
+module Main {
+    do main() -> Int {
+        set live x : Int = 5;
+        was x.5
+    }
+}

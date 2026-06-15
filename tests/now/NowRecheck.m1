@@ -1,0 +1,7 @@
+module Main {
+    do main() -> Int {
+        set live x : Int = 2;
+        set live x : Int = x + 3;
+        now x == 5
+    }
+}

@@ -1,0 +1,5 @@
+world Main {
+    do main() -> Int {
+        say(42)
+    }
+}

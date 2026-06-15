@@ -98,6 +98,15 @@ module M1C {
     let TK_WHEN : Int = 54
     let TK_WILL : Int = 55
     let TK_LIVE : Int = 61
+    -- Surface-syntax keywords (Week 2 F4): world/do/set/pick/shape/say/show.
+    -- Values match the M1Tk enum order in lexer.m0 / lexer.c.
+    let TK_WORLD : Int = 56
+    let TK_DO : Int = 57
+    let TK_SET : Int = 58
+    let TK_PICK : Int = 59
+    let TK_SHAPE : Int = 60
+    let TK_SAY : Int = 62
+    let TK_SHOW : Int = 63
     let TK_THEN : Int = 64
 
     let N_PROG : Int = 0
@@ -695,6 +704,34 @@ module M1C {
                 mk_pr(n_let(nm, tr.node, vr.node, br.node, line, col), br.st)
             }
         } else {
+        if k == TK_SET {
+            let s_after_set : PS = ps_adv(s);
+            let is_live : Int = if ps_kind(s_after_set) == TK_LIVE { 1 } else { 0 };
+            let nm_ps : PS = if is_live == 1 { ps_adv(s_after_set) } else { s_after_set };
+            let nm : String = ps_str(nm_ps);
+            let s_after_name : PS = ps_adv(nm_ps);
+            let s_after_colon : PS = ps_adv(s_after_name);
+            let tr : PR = parse_type_expr(s_after_colon);
+            let s_after_type : PS = ps_adv(tr.st);
+            let vr : PR = parse_expr(s_after_type);
+            let s_after_val : PS = ps_adv(vr.st);
+            let br : PR = parse_expr(s_after_val);
+            if is_live == 1 {
+                mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
+            } else {
+                mk_pr(n_let(nm, tr.node, vr.node, br.node, line, col), br.st)
+            }
+        } else {
+        if k == TK_SAY {
+            let r : PR = parse_expr(ps_adv(ps_adv(s)));
+            let s2 : PS = ps_adv(r.st);
+            mk_pr(n_call(n_name("m0_println", line, col), m0_cons(r.node, m0_nil), 1, line, col), s2)
+        } else {
+        if k == TK_SHOW {
+            let r : PR = parse_expr(ps_adv(ps_adv(s)));
+            let s2 : PS = ps_adv(r.st);
+            mk_pr(n_call(n_name("m0_print", line, col), m0_cons(r.node, m0_nil), 1, line, col), s2)
+        } else {
         if k == TK_MATCH {
             let sr : PR = parse_expr(ps_adv(s));
             let ar : PR = gather_arms(ps_adv(sr.st), m0_nil);
@@ -767,7 +804,7 @@ module M1C {
             mk_pr(r.node, ps_adv(r.st))
         } else {
             mk_pr(n_unit(line, col), ps_err(s))
-        }}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn parse_decl(s : PS) -> PR {
@@ -790,6 +827,17 @@ module M1C {
             let s4 : PS = ps_adv(br.st);
             mk_pr(n_fn_decl(nm, pr.node, list_len(pr.node), rr.node, br.node, line, col), s4)
         } else {
+        if k == TK_DO {
+            -- `do name(params) -> Ret { body }` == `fn ...` (Week 2 F4).
+            let nm : String = ps_str(ps_adv(s));
+            let pr : PR = gather_params(ps_adv(ps_adv(s)), m0_nil);
+            let s2 : PS = ps_adv(pr.st);
+            let rr : PR = parse_type_expr(s2);
+            let s3 : PS = ps_adv(rr.st);
+            let br : PR = parse_expr(s3);
+            let s4 : PS = ps_adv(br.st);
+            mk_pr(n_fn_decl(nm, pr.node, list_len(pr.node), rr.node, br.node, line, col), s4)
+        } else {
         if k == TK_EXTERNAL {
             let cn : String = ps_str(ps_adv(s));
             -- skip 'external', the name string, and the ':'
@@ -797,8 +845,8 @@ module M1C {
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_extern(cn, tr.node, line, col), tr.st)
         } else {
-            mk_pr(n_unit(line, col), ps_err(s))
-        }}}
+            mk_pr(n_unit(line, col), ps_err(ps_adv(s)))
+        }}}}
     }
 
     fn gather_decls(s : PS, acc : Int) -> PR {
@@ -821,10 +869,16 @@ module M1C {
 
     fn gather_modules(s : PS, acc : Int) -> PR {
         if ps_kind(s) == TK_EOF { mk_pr(rev(acc), s) } else {
+            -- `world Name { ... }` parses identically to `module Name { ... }`
+            -- (Week 2 F4): same shape, different keyword.
             if ps_kind(s) == TK_MODULE {
                 let r : PR = parse_module(s);
                 gather_modules(r.st, m0_cons(r.node, acc))
-            } else { mk_pr(rev(acc), ps_err(s)) }
+            } else {
+            if ps_kind(s) == TK_WORLD {
+                let r : PR = parse_module(s);
+                gather_modules(r.st, m0_cons(r.node, acc))
+            } else { mk_pr(rev(acc), ps_err(s)) }}
         }
     }
 

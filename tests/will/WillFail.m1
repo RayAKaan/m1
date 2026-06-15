@@ -1,0 +1,5 @@
+module Main {
+    do main() -> Int {
+        will false
+    }
+}

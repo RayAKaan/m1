@@ -1,0 +1,6 @@
+world Main {
+    do main() -> Int {
+        set live x : Int = 1;
+        show(x)
+    }
+}
