@@ -1,127 +1,199 @@
 #!/usr/bin/env bash
-# Build the self-hosted M1 compiler (m1c) on Linux/macOS and run the
-# full temporal test suite. This is the reproducible pipeline that
-# validates all Week 1-3 features.
+# Build the self-hosted M1 compiler (m1c) and run the temporal test suite.
 #
-#   bootstrap m0c (C)  ->  compile m1c.m0 -> C  ->  link -> m1c
-#   m1c  ->  compile tests/*.m1 -> C  ->  link -> run
+#   bootstrap m0c (C)  ->  compiles m1c.m0 -> C  ->  link -> m1c
+#   m1c  ->  compiles tests/*.m1 -> C  ->  link -> run
 #
-# Requirements: gcc (or clang via CC=clang), python3.
-set -euo pipefail
+# Requirements: a C compiler (gcc or clang via CC=clang), python3.
+#
+# Notes on robustness (so CI behaves identically across machines):
+#   - We deliberately do NOT use `set -e`: several helpers rely on commands that
+#     return non-zero in the normal case (grep -c with 0 matches, a compiled test
+#     that prints a diagnostic, etc.). Failures are tracked explicitly via the
+#     `fail` counter, and the script exits 1 at the end iff any test failed.
+#   - Every step checks its own result and prints a clear message + the relevant
+#     artifact (generated C / stderr) on failure, so a CI log is self-explanatory.
+set -u
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 CC="${CC:-gcc}"
 WORK="${WORK:-/tmp/m1build}"
+SRC="$ROOT/src"
 mkdir -p "$WORK"
 
 pass=0
 fail=0
 
-run_test() {
-    local t="$1" f="$2" expect="$3"
-    [ -f "$f" ] || return
-    M1_SOURCE="$f" "$WORK/m1c" > "$WORK/$t.c" 2>"$WORK/$t.err" || {
-        echo "  $t: m1c FAILED"; fail=$((fail+1)); return
-    }
-    $CC -std=gnu11 -w -fcommon -include "$ROOT/src/m1/compat.h" \
-        -o "$WORK/$t.exe" "$WORK/$t.c" \
-        "$ROOT/src/m1/m0_runtime.c" "$ROOT/src/m1/phase_graph.c" 2>/dev/null || {
-        echo "  $t: gcc FAILED"; fail=$((fail+1)); return
-    }
-    local out; out="$("$WORK/$t.exe" 2>/dev/null)"
-    if [ "$out" = "$expect" ]; then
-        echo "  $t: output=$out  expected=$expect  PASS"; pass=$((pass+1))
-    else
-        echo "  $t: output=$out  expected=$expect  FAIL"
-        echo "  $t: stderr=$(cat "$WORK/$t.err" 2>/dev/null)"
-        fail=$((fail+1))
-    fi
-}
+die() { echo "FATAL: $*" >&2; echo "RESULT: FAIL"; exit 1; }
 
-run_conflict() {
-    local t="$1" f="$2" expect="$3"
-    [ -f "$f" ] || return
-    M1_SOURCE="$f" "$WORK/m1c" > "$WORK/$t.c" 2>"$WORK/$t.err" || {
-        echo "  $t: m1c FAILED"; fail=$((fail+1)); return
-    }
-    local n; n="$(grep -c M1102 "$WORK/$t.err" 2>/dev/null)" || true; n="${n:-0}"
-    if [ "$n" = "$expect" ]; then
-        echo "  $t: M1102_conflicts=$n  expected=$expect  PASS"; pass=$((pass+1))
-    else
-        echo "  $t: M1102_conflicts=$n  expected=$expect  FAIL"; fail=$((fail+1))
-    fi
-}
+# Count occurrences of a pattern in a file without tripping anything (always prints
+# a plain integer, never errors).
+count() { grep -c "$1" "$2" 2>/dev/null | head -n1 | tr -cd '0-9'; }
 
 echo "[1/5] Build bootstrap m0c from C sources"
-SRC="$ROOT/src"
 cp "$SRC"/*.c "$SRC"/*.h "$WORK"/ 2>/dev/null || true
-( cd "$WORK" && $CC -std=gnu11 -w -fcommon -o m0c \
-    main.c arena.c error.c lexer.c parser.c scope.c types.c checker.c reduce.c codegen.c )
-echo "    -> $WORK/m0c"
+# reduce.c may carry a static/non-static `reduce` mismatch on strict compilers;
+# normalize the copy (no-op if already fixed in the repo).
+sed -i 's/^static Node \*reduce(Node \*n, Reducer \*r);/\/* fwd-decl removed: matches reduce.h *\//' "$WORK/reduce.c" 2>/dev/null || true
+sed -i 's/^static Node \*reduce(Node \*n, Reducer \*r) {/Node *reduce(Node *n, Reducer *r) {/' "$WORK/reduce.c" 2>/dev/null || true
+( cd "$WORK" && $CC -std=gnu11 -w -fcommon -fno-strict-aliasing -O0 -o m0c \
+    main.c arena.c error.c lexer.c parser.c scope.c types.c checker.c reduce.c codegen.c ) \
+    || die "could not build bootstrap m0c"
+[ -x "$WORK/m0c" ] || die "m0c was not produced"
 
-echo "[2/5] Compile lexer.m0 -> C, transform M1Tk sum tag to int64"
-"$WORK/m0c" "$SRC/m1/lexer.m0" > "$WORK/lexer_raw.c"
-python3 - "$WORK/lexer_raw.c" "$WORK/lexer_int.c" <<'PY'
+echo "[2/5] Compile lexer.m0 -> C, normalize M1Tk tag to int64"
+"$WORK/m0c" "$SRC/m1/lexer.m0" > "$WORK/lexer_raw.c" 2>"$WORK/lexer_raw.err" \
+    || die "m0c failed to compile lexer.m0 (see $WORK/lexer_raw.err)"
+python3 - "$WORK/lexer_raw.c" "$WORK/lexer_int.c" <<'PY' || die "lexer transform failed"
 import re, sys
 c = open(sys.argv[1]).read()
-c = c.replace(
-    "typedef struct M1Tk M1Tk;\nstruct M1Tk {\n  int tag;\n  union {\n    char _unused[1];\n    } data;\n};",
-    "typedef int64_t M1Tk;"
-)
-c = re.sub(r'M1Tk v = \{ \.tag = (M1Tk_\w+), \.data = \{0\} \};', r'M1Tk v = \1;', c)
+# Make the M1Tk sum-type a plain int64 so M1Token.kind ABI matches m1c.m0 (which
+# treats token kinds as Int). This avoids a 4-byte-enum vs 8-byte-int mismatch.
+# Match the struct flexibly (any internal whitespace) so it works regardless of the
+# exact spacing m0c happens to emit.
+c2 = re.sub(
+    r'typedef struct M1Tk M1Tk;\s*struct M1Tk\s*\{.*?\}\s*;',
+    'typedef int64_t M1Tk;',
+    c, count=1, flags=re.S)
+if c2 == c:
+    sys.stderr.write("WARN: M1Tk struct pattern not found; emitting unchanged\n")
+c = c2
+c = re.sub(r'M1Tk v = \{\s*\.tag = (M1Tk_\w+),\s*\.data = \{0\}\s*\};', r'M1Tk v = \1;', c)
 c = c.replace('.tag', '')
 open(sys.argv[2], 'w').write(c)
 PY
+grep -q "typedef int64_t M1Tk;" "$WORK/lexer_int.c" \
+    || die "lexer M1Tk normalization did not apply (struct shape changed?)"
 
 echo "[3/5] Compile m1c.m0 -> C with bootstrap m0c"
-"$WORK/m0c" "$SRC/m1/m1c.m0" > "$WORK/m1c_self.c"
-echo "    -> $WORK/m1c_self.c"
+"$WORK/m0c" "$SRC/m1/m1c.m0" > "$WORK/m1c_self.c" 2>"$WORK/m1c_self.err"
+m0c_errs="$(count ERROR "$WORK/m1c_self.err")"; m0c_errs="${m0c_errs:-0}"
+if [ "$m0c_errs" != "0" ]; then
+    echo "---- m0c errors compiling m1c.m0 ----"; cat "$WORK/m1c_self.err"
+    die "m0c reported $m0c_errs error(s) compiling m1c.m0"
+fi
+[ -s "$WORK/m1c_self.c" ] || die "m1c_self.c is empty"
 
 echo "[4/5] Link the self-hosted m1c"
-$CC -std=gnu11 -w -fcommon -include "$ROOT/src/m1/compat.h" -o "$WORK/m1c" \
-    "$WORK/m1c_self.c" "$ROOT/src/m1/m0_runtime.c" "$ROOT/src/m1/phase_graph.c" \
-    "$WORK/lexer_int.c"
+$CC -std=gnu11 -w -fcommon -fno-strict-aliasing -O0 -include "$SRC/m1/compat.h" -o "$WORK/m1c" \
+    "$WORK/m1c_self.c" "$SRC/m1/m0_runtime.c" "$SRC/m1/phase_graph.c" \
+    "$WORK/lexer_int.c" 2>"$WORK/m1c_link.err" \
+    || { echo "---- link errors ----"; cat "$WORK/m1c_link.err"; die "could not link m1c"; }
+[ -x "$WORK/m1c" ] || die "m1c was not produced"
 echo "    -> $WORK/m1c"
 
-echo "[5/5] Run temporal test suite"
+# ---------------------------------------------------------------------------
+# Test helpers. Each prints PASS/FAIL and, on FAIL, the generated C + stderr so a
+# CI log is self-explanatory. None of them rely on shell error-exit behavior.
+# ---------------------------------------------------------------------------
 
-echo "  5a) Phase graph basic tests"
-for t in WasBasic WasBefore WasNever WasRuntime WasLive; do
-    run_test "$t" "$ROOT/tests/phase_graph/$t.m1" ""
-done
+# Compile a .m1 with the self-hosted m1c and link the result. Sets globals:
+#   COUT  = path to generated C
+#   CERR  = path to m1c stderr (compile-time diagnostics)
+#   ROUT  = program stdout (if it built+ran), RERR = program stderr, REXIT = exit
+# Returns 0 if m1c compiled it (regardless of program result), 1 if m1c failed.
+build_one() {
+    local t="$1" f="$2"
+    COUT="$WORK/$t.c"; CERR="$WORK/$t.err"; RERR="$WORK/$t.run_err"
+    ROUT=""; REXIT=0
+    M1_SOURCE="$f" "$WORK/m1c" > "$COUT" 2>"$CERR" || return 1
+    $CC -std=gnu11 -w -fcommon -fno-strict-aliasing -O0 -include "$SRC/m1/compat.h" \
+        -o "$WORK/$t.exe" "$COUT" "$SRC/m1/m0_runtime.c" "$SRC/m1/phase_graph.c" \
+        2>"$WORK/$t.cc" || return 1
+    ROUT="$("$WORK/$t.exe" 2>"$RERR")"; REXIT=$?
+    return 0
+}
 
-echo "  5b) Now re-check tests"
-run_test NowRecheck "$ROOT/tests/now/NowRecheck.m1" ""
-run_test NowOk     "$ROOT/tests/now/NowOk.m1" 1
+show_fail() {
+    local t="$1"
+    echo "    --- $t: generated C (main) ---"
+    sed -n '/int main/,/^}/p' "$WORK/$t.c" 2>/dev/null | sed 's/^/    /'
+    echo "    --- $t: m1c stderr ---"; sed 's/^/    /' "$WORK/$t.err" 2>/dev/null
+    echo "    --- $t: cc stderr ---";  sed 's/^/    /' "$WORK/$t.cc" 2>/dev/null
+}
 
-echo "  5c) Will return-guard tests"
-run_test WillOk   "$ROOT/tests/will/WillOk.m1"   1
-run_test WillFail "$ROOT/tests/will/WillFail.m1" 0
+# expect exact program stdout
+check_out() {
+    local t="$1" f="$2" expect="$3"
+    if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
+    if ! build_one "$t" "$f"; then
+        echo "  $t: FAIL (m1c/cc could not build)"; show_fail "$t"; fail=$((fail+1)); return
+    fi
+    if [ "$ROUT" = "$expect" ]; then
+        echo "  $t: output=$ROUT expected=$expect PASS"; pass=$((pass+1))
+    else
+        echo "  $t: output=$ROUT expected=$expect FAIL"; show_fail "$t"; fail=$((fail+1))
+    fi
+}
 
-echo "  5d) Value-named phase test"
-run_test WasValPhase "$ROOT/tests/phase_graph/WasValPhase.m1" 11110
+# expect a count of a compile-time diagnostic code in m1c stderr
+check_diag() {
+    local t="$1" f="$2" code="$3" expect="$4"
+    if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
+    if ! build_one "$t" "$f"; then
+        echo "  $t: FAIL (m1c/cc could not build)"; show_fail "$t"; fail=$((fail+1)); return
+    fi
+    local n; n="$(count "$code" "$CERR")"; n="${n:-0}"
+    if [ "$n" = "$expect" ]; then
+        echo "  $t: ${code}=$n expected=$expect PASS"; pass=$((pass+1))
+    else
+        echo "  $t: ${code}=$n expected=$expect FAIL"; show_fail "$t"; fail=$((fail+1))
+    fi
+}
 
-echo "  5e) Surface syntax tests"
-run_test WorldDoSet "$ROOT/tests/surface/WorldDoSet.m1" 1
-run_test SaySay    "$ROOT/tests/surface/SaySay.m1"     ""
-run_test SayInt    "$ROOT/tests/surface/SayInt.m1"     ""
+# expect a count of a runtime diagnostic code in the program's stderr
+check_rdiag() {
+    local t="$1" f="$2" code="$3" expect="$4"
+    if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
+    if ! build_one "$t" "$f"; then
+        echo "  $t: FAIL (m1c/cc could not build)"; show_fail "$t"; fail=$((fail+1)); return
+    fi
+    local n; n="$(count "$code" "$RERR")"; n="${n:-0}"
+    if [ "$n" = "$expect" ]; then
+        echo "  $t: ${code}=$n expected=$expect PASS"; pass=$((pass+1))
+    else
+        echo "  $t: ${code}=$n expected=$expect FAIL"; show_fail "$t"; fail=$((fail+1))
+    fi
+}
 
-echo "  5f) Records + function-parameter tests"
-run_test RecBasic "$ROOT/tests/records/RecBasic.m1"       3
-run_test RecParam "$ROOT/tests/records/RecParam.m1"      10
-run_test FnParam  "$ROOT/tests/functions/FnParam.m1"     16
+PG="$ROOT/tests/phase_graph"
+echo "[5/5] Run test suite"
 
-echo "  5g) Conflict detection tests"
-run_conflict WillNowConflict "$ROOT/tests/conflict/WillNowConflict.m1" 1
-run_conflict NoConflict      "$ROOT/tests/conflict/NoConflict.m1"     0
+echo "  -- Phase Graph (was folding) --"
+check_out WasBasic    "$PG/WasBasic.m1"    1
+check_out WasBefore   "$PG/WasBefore.m1"   1
+check_out WasNever    "$PG/WasNever.m1"    0
+check_out WasRuntime  "$PG/WasRuntime.m1"  0
+check_out WasLive     "$PG/WasLive.m1"     1
+check_out WasValPhase "$PG/WasValPhase.m1" 11110
 
-echo "  5h) Branch-aware soundness tests"
-run_test CondNoFold   "$ROOT/tests/branch/CondNoFold.m1"   0
-run_test StraightFold "$ROOT/tests/branch/StraightFold.m1" 1
+echo "  -- now re-check (F1) --"
+check_out NowOk      "$ROOT/tests/now/NowOk.m1"      1
+check_out NowRecheck "$ROOT/tests/now/NowRecheck.m1" 1
 
-echo "Done: $((pass + fail)) tests ran — $pass passed, $fail failed."
-if [ "$fail" -ne 0 ]; then
-    echo "RESULT: FAIL"
-    exit 1
-fi
+echo "  -- will return guard (F2) --"
+check_out WillOk   "$ROOT/tests/will/WillOk.m1"   1
+check_out WillFail "$ROOT/tests/will/WillFail.m1" 0
+
+echo "  -- surface syntax (F4) --"
+check_out WorldDoSet "$ROOT/tests/surface/WorldDoSet.m1" 1
+check_out SaySay     "$ROOT/tests/surface/SaySay.m1"     ""
+check_out SayInt     "$ROOT/tests/surface/SayInt.m1"     ""
+
+echo "  -- records + function params (W3 Item 1) --"
+check_out RecBasic "$ROOT/tests/records/RecBasic.m1"   3
+check_out RecParam "$ROOT/tests/records/RecParam.m1"   10
+check_out FnParam  "$ROOT/tests/functions/FnParam.m1"  16
+
+echo "  -- will+now conflict detection (W3 Item 2) --"
+check_diag WillNowConflict "$ROOT/tests/conflict/WillNowConflict.m1" M1102 1
+check_diag NoConflict      "$ROOT/tests/conflict/NoConflict.m1"      M1102 0
+
+echo "  -- branch-aware soundness (W3 Item 3) --"
+check_out CondNoFold   "$ROOT/tests/branch/CondNoFold.m1"   0
+check_out StraightFold "$ROOT/tests/branch/StraightFold.m1" 1
+
+echo "Done: $((pass + fail)) checks ran — $pass passed, $fail failed."
+if [ "$fail" -ne 0 ]; then echo "RESULT: FAIL"; exit 1; fi
 echo "RESULT: PASS"

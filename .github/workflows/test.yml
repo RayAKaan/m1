@@ -7,6 +7,11 @@ on:
     branches: [ main ]
 
 jobs:
+  # Reproducible self-hosting pipeline:
+  #   bootstrap m0c (C) -> compile m1c.m0 -> self-hosted m1c -> compile+run tests.
+  # Builds everything from source (no reliance on the committed m1c.exe) and runs the
+  # full temporal test suite, exiting non-zero on any failure. The script prints the
+  # generated C + stderr for any failing test, so this log is self-explanatory.
   selfhost-linux:
     runs-on: ubuntu-latest
     steps:
@@ -17,17 +22,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc python3
 
-      - name: Show versions
+      - name: Versions
         run: |
-          gcc --version
+          gcc --version | head -n1
           python3 --version
+          bash --version | head -n1
 
-      - name: Build self-hosted m1c and run test suite
+      - name: Build self-hosted m1c and run the temporal test suite
         run: |
           chmod +x src/m1/build_selfhost.sh
           bash src/m1/build_selfhost.sh
 
-      - name: Upload generated C on failure
+      - name: Upload generated C/diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
