@@ -13,6 +13,8 @@ int64_t phase_graph_will_check(const char *var, const char *phase);
 int64_t phase_graph_now_recheck_declare(int64_t cond_node);
 int64_t phase_graph_now_recheck_count(void);
 int64_t phase_graph_now_recheck_get_node(int64_t idx);
+int64_t phase_graph_constraint_check(const char *var, int64_t op, int64_t val, int64_t kind);
+void    phase_graph_constraint_reset(void);
 void    phase_graph_free(void);
 
 #endif

@@ -25,6 +25,8 @@ module M1C {
     external "phase_graph_now_recheck_declare" : Int -> Int
     external "phase_graph_now_recheck_count" : Unit -> Int
     external "phase_graph_now_recheck_get_node" : Int -> Int
+    external "phase_graph_constraint_check" : String -> Int -> Int -> Int -> Int
+    external "phase_graph_constraint_reset" : Unit -> Int
 
     fn pg_init() -> Int { phase_graph_init(()) }
     fn pg_record(v : String, p : String) -> Int { phase_graph_record(v, p) }
@@ -34,6 +36,10 @@ module M1C {
     fn pg_rc_declare(n : Int) -> Int { phase_graph_now_recheck_declare(n) }
     fn pg_rc_count() -> Int { phase_graph_now_recheck_count(()) }
     fn pg_rc_get_node(i : Int) -> Int { phase_graph_now_recheck_get_node(i) }
+    fn pg_constraint_check(var : String, op : Int, val : Int, kind : Int) -> Int {
+        phase_graph_constraint_check(var, op, val, kind)
+    }
+    fn pg_constraint_reset() -> Int { phase_graph_constraint_reset(()) }
 
     type M1Token = { kind : Int, line : Int, col : Int, int_val : Int, str_val : String }
     type M1Lexer = { src : String, pos : Int, line : Int, col : Int }
@@ -494,6 +500,7 @@ module M1C {
     fn parse_type_expr(s : PS) -> PR { parse_type_arrow(s) }
 
     fn gather_params(s : PS, acc : Int) -> PR {
+        if ps_kind(s) == TK_LPAREN { gather_params(ps_adv(s), acc) } else {
         if ps_kind(s) == TK_RPAREN { mk_pr(rev(acc), ps_adv(s)) } else {
         if ps_kind(s) == TK_UNIT { mk_pr(rev(acc), ps_adv(s)) } else {
             let nm : String = ps_str(s);
@@ -502,7 +509,7 @@ module M1C {
             let p : Int = mk_param(nm, r.node);
             let s3 : PS = if ps_kind(r.st) == TK_COMMA { ps_adv(r.st) } else { r.st };
             gather_params(s3, m0_cons(p, acc))
-        }}
+        }}}
     }
 
     fn parse_pat_atom(s : PS) -> PR {
@@ -654,14 +661,14 @@ module M1C {
         }
     }
 
-    fn gather_field_inits(s : PS, acc : Int) -> PR {
-        if ps_kind(s) == TK_RBRACE { mk_pr(rev(acc), ps_adv(s)) } else {
-        if ps_kind(s) == TK_EOF { mk_pr(rev(acc), ps_err(s)) } else {
+    fn gather_field_inits(s : PS, acc : Int, line : Int, col : Int) -> PR {
+        if ps_kind(s) == TK_RBRACE { mk_pr(n_record(rev(acc), list_len(acc), line, col), ps_adv(s)) } else {
+        if ps_kind(s) == TK_EOF { mk_pr(n_record(rev(acc), list_len(acc), line, col), ps_err(s)) } else {
             let nm : String = ps_str(s);
             let s2 : PS = ps_adv(ps_adv(s));
             let r : PR = parse_impl(s2);
             let s3 : PS = if ps_kind(r.st) == TK_COMMA { ps_adv(r.st) } else { r.st };
-            gather_field_inits(s3, m0_cons(mk_fi(nm, r.node), acc))
+            gather_field_inits(s3, m0_cons(mk_fi(nm, r.node), acc), line, col)
         }}
     }
 
@@ -782,7 +789,8 @@ module M1C {
         if k == TK_WHEN {
             let cr : PR = parse_expr(ps_adv(s));
             let s2 : PS = ps_adv(cr.st);
-            let br : PR = parse_expr(s2);
+            let s3 : PS = if ps_kind(s2) == TK_THEN { ps_adv(s2) } else { s2 };
+            let br : PR = parse_expr(s3);
             mk_pr(n_when(cr.node, br.node, line, col), br.st)
         } else {
         if k == TK_LIVE {
@@ -797,7 +805,18 @@ module M1C {
             let br : PR = parse_expr(s_after_val);
             mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
         } else {
-        if k == TK_LBRACE { gather_field_inits(ps_adv(s), m0_nil) } else {
+        if k == TK_LBRACE {
+            -- Disambiguate a record literal `{ name = ... }` from a block `{ expr }`.
+            -- A record starts with an identifier immediately followed by `=`.
+            -- Anything else is a brace-delimited block whose value is the inner
+            -- expression (needed for `when C then { B }`).
+            let s_in : PS = ps_adv(s);
+            let is_record : Int = if ps_kind(s_in) == TK_IDENT {
+                if ps_kind(ps_adv(s_in)) == TK_EQ { 1 } else { 0 }
+            } else { 0 };
+            if is_record == 1 { gather_field_inits(s_in, m0_nil, line, col) }
+            else { let br : PR = parse_expr(s_in); mk_pr(br.node, ps_adv(br.st)) }
+        } else {
         if k == TK_LBRACK { gather_list_elems(ps_adv(s), m0_nil) } else {
         if k == TK_LPAREN {
             let r : PR = parse_expr(ps_adv(s));
@@ -813,7 +832,7 @@ module M1C {
         let col : Int = ps_col(s);
         if k == TK_TYPE {
             let nm : String = ps_str(ps_adv(s));
-            let s2 : PS = ps_adv(ps_adv(s));
+            let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_type_decl(nm, tr.node, line, col), tr.st)
         } else {
@@ -1004,6 +1023,15 @@ module M1C {
         }}}}}}}}}}}}}
     }
 
+    fn flip_op(op : Int) -> Int {
+        if op == OP_LT { OP_GT } else {
+        if op == OP_GT { OP_LT } else {
+        if op == OP_LE { OP_GE } else {
+        if op == OP_GE { OP_LE } else {
+        op
+        }}}}
+    }
+
     fn emit_c_expr_ea(reg : Int, l : Int, first : Int) -> Int {
         if m0_is_nil(l) == 1 { 0 } else {
             let _p0 : Int = if first == 0 { m0_print(", ") } else { 0 };
@@ -1092,6 +1120,31 @@ module M1C {
         }
     }
 
+    -- Register a will/now constraint for literal-bounds contradiction detection.
+    -- Extracts (var, op, literal) from a binary condition of the form
+    -- `var op LIT` or `LIT op var` (the latter flips the comparison op).
+    -- Non-binary or non-literal conditions are conservatively skipped.
+    fn register_constraint(cond : Int, kind : Int) -> Int {
+        let k : Int = m0_get(cond, 0);
+        if k == N_BINARY {
+            let op : Int = m0_get(cond, 3);
+            let l : Int = m0_get(cond, 4);
+            let r : Int = m0_get(cond, 5);
+            let lk : Int = m0_get(l, 0);
+            let rk : Int = m0_get(r, 0);
+            if lk == N_NAME /\ rk == N_INT {
+                let nm : String = m0_load_string(l, 3);
+                let val : Int = m0_get(r, 3);
+                pg_constraint_check(nm, op, val, kind)
+            } else {
+            if lk == N_INT /\ rk == N_NAME {
+                let nm : String = m0_load_string(r, 3);
+                let val : Int = m0_get(l, 3);
+                pg_constraint_check(nm, flip_op(op), val, kind)
+            } else { 0 }}
+        } else { 0 }
+    }
+
     fn emit_c_expr(reg : Int, e : Int) -> Int {
         let k : Int = m0_get(e, 0);
         if k == N_INT { m0_print_int(m0_get(e, 3)) } else {
@@ -1159,12 +1212,9 @@ module M1C {
             m0_print("; })")
         } else {
         if k == N_RECORD {
-            let r2 : Int = lookup_reg(reg, m0_load_string(e, 3));
-            let _p0 : Int = m0_print("(");
-            let _p1 : Int = emit_c_type(reg, reg_type(r2));
-            let _p2 : Int = m0_print("){ ");
-            let _p3 : Int = emit_c_expr_ef(reg, m0_get(e, 3), 1);
-            m0_print(" })")
+            let _p0 : Int = m0_print("{ ");
+            let _p1 : Int = emit_c_expr_ef(reg, m0_get(e, 3), 1);
+            m0_print(" }")
         } else {
         if k == N_WHILE {
             let _p0 : Int = m0_print("({ while (");
@@ -1246,22 +1296,23 @@ module M1C {
             }}
         } else {
         if k == N_WILL {
-            -- will C : evaluate the commitment condition. (Full commitment
-            -- tracking + return guard is Week 2 work.) Wrapped so the let has
-            -- a body expression, which the bootstrap m0c parser requires.
+            let cond : Int = m0_get(e, 3);
+            -- Register for conflict detection (kind=1 = will).
+            let _rc : Int = register_constraint(cond, 1);
             let _p0 : Int = m0_print("(");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            let _p1 : Int = emit_c_expr(reg, cond);
             m0_print(")")
         } else {
         if k == N_NOW {
-            -- now C : emit a runtime invariant assertion + register the
-            -- condition node so the N_ASSIGN emitter can re-check it
-            -- after every subsequent mutation.
             let cond : Int = m0_get(e, 3);
             let _reg : Int = pg_rc_declare(cond);
+            -- Register for conflict detection (kind=0 = now).
+            let _rc : Int = register_constraint(cond, 0);
             let _p0 : Int = m0_print("({ if (!(");
             let _p1 : Int = emit_c_expr(reg, cond);
-            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
+            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } ");
+            let _p3 : Int = emit_c_expr(reg, cond);
+            let _p4 : Int = m0_print("; })");
             0
         } else {
         if k == N_WHEN {
@@ -1326,9 +1377,10 @@ module M1C {
         let _p2 : Int = m0_print(nm);
         let _p3 : Int = m0_print("(");
         let _p4 : Int = if is_main == 1 { m0_print("void") } else { emit_fn_ep(reg, params, 1) };
-        -- Reset the compile-time Phase Graph before walking this function body.
-        -- Phase state (live/freeze/was) is tracked per-function during emit.
+        -- Reset the compile-time Phase Graph and constraint table before
+        -- walking this function body. Phase state is tracked per-function.
         let _pg : Int = pg_init();
+        let _cr : Int = pg_constraint_reset();
         let _p5 : Int = m0_print(") {\n  return ");
         let _p6 : Int = emit_c_expr(reg, body);
         m0_print(";\n}\n")
@@ -1362,6 +1414,18 @@ module M1C {
         let decls : Int = m0_get(m, 4);
         let reg : Int = build_reg(decls, m0_nil);
         let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
+        -- AST node kind constants, needed by phase_graph.c at link time.
+        let _nc0 : Int = m0_print("int64_t N_PROG = 0; int64_t N_MOD = 1; int64_t N_TYPE_DECL = 2;\n");
+        let _nc1 : Int = m0_print("int64_t N_PROP_DECL = 3; int64_t N_FN_DECL = 4; int64_t N_EXTERN = 5;\n");
+        let _nc2 : Int = m0_print("int64_t N_INT = 6; int64_t N_STRING = 7; int64_t N_BOOL = 8;\n");
+        let _nc3 : Int = m0_print("int64_t N_UNIT = 9; int64_t N_NAME = 10; int64_t N_BINARY = 11;\n");
+        let _nc4 : Int = m0_print("int64_t N_NOT = 12; int64_t N_FIELD = 13; int64_t N_CALL = 14;\n");
+        let _nc5 : Int = m0_print("int64_t N_SEQ = 15; int64_t N_LET = 16; int64_t N_LAMBDA = 17;\n");
+        let _nc6 : Int = m0_print("int64_t N_MATCH = 18; int64_t N_IF = 19; int64_t N_RECORD = 20;\n");
+        let _nc7 : Int = m0_print("int64_t N_LIST = 21; int64_t N_ASSIGN = 22; int64_t N_WHILE = 23;\n");
+        let _nc8 : Int = m0_print("int64_t N_LIVE = 24; int64_t N_FREEZE = 25; int64_t N_WAS = 26;\n");
+        let _nc9 : Int = m0_print("int64_t N_WILL = 27; int64_t N_NOW = 28; int64_t N_WHEN = 29;\n");
+        let _ncA : Int = m0_print("int64_t N_FOR = 30;\n\n");
         -- Prototype for the Phase Graph runtime query, used by `was` when the
         -- result is undecidable at compile time (pg_query returned -1).
         let _hq : Int = m0_print("extern int phase_graph_query(const char*, const char*);\n\n");

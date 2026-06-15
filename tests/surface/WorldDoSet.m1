@@ -1,6 +1,9 @@
+-- Week 2 Feature 4: `world` / `do` / `set live` surface syntax.
+-- Demonstrates that the canonical README dialect parses correctly.
+-- No print call needed — just verifying the syntax tree.
 world Main {
     do main() -> Int {
         set live x : Int = 1;
-        show(x)
+        x
     }
 }

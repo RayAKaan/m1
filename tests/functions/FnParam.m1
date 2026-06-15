@@ -1,0 +1,6 @@
+module Main {
+    do add3(a : Int, b : Int, c : Int) -> Int { a + b + c }
+    do main() -> Int {
+        add3(5, 6, 5)
+    }
+}

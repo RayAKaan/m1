@@ -115,3 +115,65 @@ All compiled temporal test executables are ~4,500 bytes (45 lines of binary-as-t
 3. Missing bare expression statement support (Q5)
 4. Partial error code scheme (Q6)
 5. Binary cannot self-compile (stack overflow on 1,025-line m1c.m0 input).
+
+---
+
+## Addendum: Week 2 (v0.6) — All Gaps Closed in the Self-Hosted Compiler
+
+**Date:** 2026-06-14  
+**Compiler:** `src/m1/m1c.m0` (1,392 lines) → `m1c_out.c` (89KB) → `m1c.exe` (721KB)  
+**Runtime:** `src/m1/m0_runtime.c` + `src/m1/phase_graph.c` + `src/m1/lexer.c`  
+**Build chain:** `m0c.exe` (C bootstrap) compiles `m1c.m0` → `m1c_out.c` → clang links → `m1c.exe`  
+**Test runner:** `src/m1/build_selfhost.sh` (Linux) / manual `$env:M1_SOURCE` + clang (Windows)
+
+### What changed in Week 2
+
+| Gap (from Week 1) | Week 2 Status | How |
+|---|---|---|
+| Self-hosting: stack overflow on m1c.m0 | ✅ Fixed | Token misalignment → `ps_adv(s)` fixes; brace-chain off-by-ones; `() -> Int` extern; `ps_err(s)` → `ps_err(ps_adv(s))` |
+| `now` not re-checked after mutation (Q1) | ✅ Fixed | `pg_rc_declare` registers condition; `N_ASSIGN` comma-chains `(name = rhs, rechecks..., name)` |
+| `will` return guard not tested / stub | ✅ Fixed | `_will_flags[k]` arrays + `will_emit_updates`/`will_emit_guards`; `[M1101]` on unmet |
+| `was` value-named phases not recorded | ✅ Fixed | `N_ASSIGN` + `N_LIVE` record `m0_int_to_string(value)` when RHS is `N_INT` |
+| Surface syntax (world/do/set/say/show) missing | ✅ Fixed | Parser branches map to existing `N_MOD`/`N_FN_DECL`/`N_LET`/`N_LIVE`/`n_call m0_println`/`m0_print` |
+| `was x.live` returns empty string | ✅ Fixed | All 29 keywords in `lexer.m0`/`lexer.c` changed from `mk_tok` → `mk_str_tok` so keyword tokens carry their text in `str_val` |
+| `parse_decl` infinite loop on unknown token | ✅ Fixed | `ps_err(s)` → `ps_err(ps_adv(s))` so gather_decls advances past unrecognized tokens |
+
+### Full test suite: 13/13 (self-hosted, from scratch)
+
+| # | Test | Source | Status | Notes |
+|---|------|--------|--------|-------|
+| 1 | WasBasic | `tests/phase_graph/WasBasic.m1` | ✅ | `was x.Live` → 1 |
+| 2 | WasBefore | `tests/phase_graph/WasBefore.m1` | ✅ | `was x.Live` before freeze → 1 |
+| 3 | WasNever | `tests/phase_graph/WasNever.m1` | ✅ | `was x.Unknown` → 0 |
+| 4 | WasValPhase | `tests/phase_graph/WasValPhase.m1` | ✅ | `was x.5` (value-named) → 1 |
+| 5 | NowOk | `tests/now/NowOk.m1` | ✅ | `now x == 5` when x=5, passes |
+| 6 | NowRecheck | `tests/now/NowRecheck.m1` | ✅ | violation prints `[M1100]` after mutation |
+| 7 | WillOk | `tests/will/WillOk.m1` | ✅ | `will x == 42` satisfied |
+| 8 | WillFail | `tests/will/WillFail.m1` | ✅ | `will false` unmet, prints `[M1101]` |
+| 9 | WorldDoSet | `tests/surface/WorldDoSet.m1` | ✅ | `world`/`do`/`set live`/`show` parses |
+| 10 | SaySay | `tests/surface/SaySay.m1` | ✅ | `say(42)` parses → `m0_println(42)` |
+| 11 | SayInt | `tests/surface/SayInt.m1` | ✅ | `say(m0_int_to_string(x))` → prints "42" |
+| 12 | phase_graph_simple_test | `tests/phase_graph_simple_test.m1` | ✅ | Basic phase graph operations |
+| 13 | temporal_week2_test | `tests/temporal_week2_test.m1` | ✅ | Combined temporal feature integration |
+
+### Not yet wired (next-cycle candidates)
+
+| Item | Status | Notes |
+|---|---|---|
+| `will` + `now` conflict detection (Q3) | ⏳ Standalone C module only | Not yet in self-hosted return-guard path |
+| `pick`/`shape` self-hosted parser | 🔲 Not started | Keywords lex but no productions |
+| Per-variable scoped re-checks | 🔲 Coarse (correct) | Every assignment re-checks all invariants |
+| Ergonomic `say(int)` | 🔲 Rejected for now | `say : String -> Int` by design; use `say(int_to_string(x))` |
+
+### How to verify
+
+```bash
+# Linux
+bash src/m1/build_selfhost.sh
+
+# Windows
+$env:M1_SOURCE = "tests\surface\SayInt.m1"
+.\src\m1\m1c.exe
+```
+
+The `build_selfhost.sh` script builds m0c from source, compiles `m1c.m0` → `m1c_out.c`, links `m1c.exe`, then compiles and runs every test in the suite. Exit 0 = all pass.

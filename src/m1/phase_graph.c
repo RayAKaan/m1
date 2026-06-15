@@ -31,6 +31,23 @@ extern int64_t  m0_is_nil(int64_t list);
 extern int64_t  m0_head(int64_t list);
 extern int64_t  m0_tail(int64_t list);
 
+/* binary-operator kind constants (mirrors m1c.m0) */
+#define OP_ADD  0
+#define OP_SUB  1
+#define OP_MUL  2
+#define OP_DIV  3
+#define OP_MOD  4
+#define OP_EQ   5
+#define OP_NEQ  6
+#define OP_LT   7
+#define OP_GT   8
+#define OP_LE   9
+#define OP_GE   10
+#define OP_AND  11
+#define OP_OR   12
+#define OP_IMPL 13
+#define OP_IFF  14
+
 /* -------------------------------------------------------------------
  * Data structures
  * ------------------------------------------------------------------ */
@@ -410,6 +427,7 @@ static void reset_commitments(void) {
     will_commit_count = 0;
     now_commit_count  = 0;
     recheck_count     = 0;
+    phase_graph_constraint_reset();
 }
 
 static int is_will_committed(const char *var, const char *phase) {
@@ -444,6 +462,100 @@ static void record_now(const char *var, const char *phase, int line, int col) {
     now_commits[now_commit_count].line = line;
     now_commits[now_commit_count].col  = col;
     now_commit_count++;
+}
+
+/* -------------------------------------------------------------------
+ * Constraint table for will+now literal-bounds contradiction detection
+ * (Item 2). Each constraint records a (var, op, literal, kind) tuple
+ * from `will C` or `now C` where C is `var op literal`.
+ * ------------------------------------------------------------------ */
+#define MAX_CONSTRAINTS 64
+
+typedef struct {
+    char   var[64];
+    int    op;
+    int64_t val;
+    int    kind;     /* 0 = now, 1 = will */
+} PGConstraint;
+
+static PGConstraint constraints[MAX_CONSTRAINTS];
+static int constraint_count;
+
+static int satisfies(int op, int64_t bound, int64_t test) {
+    switch (op) {
+        case OP_EQ:  return test == bound;
+        case OP_NEQ: return test != bound;
+        case OP_LT:  return test <  bound;
+        case OP_GT:  return test >  bound;
+        case OP_LE:  return test <= bound;
+        case OP_GE:  return test >= bound;
+        default:     return 1;
+    }
+}
+
+/* Returns 1 if c1 and c2 cannot both be true for the same variable value */
+static int contradicts(const PGConstraint *c1, const PGConstraint *c2) {
+    if (strcmp(c1->var, c2->var) != 0) return 0;
+    if (c1->kind == c2->kind) return 0; /* same kind cannot conflict */
+
+    int64_t lo = (c1->val < c2->val ? c1->val : c2->val) - 100;
+    int64_t hi = (c1->val > c2->val ? c1->val : c2->val) + 100;
+    if (lo < -1000000) lo = -1000000;
+    if (hi >  1000000) hi =  1000000;
+
+    for (int64_t v = lo; v <= hi; v++)
+        if (satisfies(c1->op, c1->val, v) && satisfies(c2->op, c2->val, v))
+            return 0;
+    return 1;
+}
+
+int64_t phase_graph_constraint_check(const char *var, int64_t op, int64_t val, int64_t kind) {
+    if (constraint_count >= MAX_CONSTRAINTS) return 0;
+
+    /* Check for contradiction against all existing constraints of opposite kind */
+    PGConstraint cand;
+    strncpy_s(cand.var, sizeof(cand.var), var, _TRUNCATE);
+    cand.op  = (int)op;
+    cand.val = val;
+    cand.kind = (int)kind;
+
+    for (int i = 0; i < constraint_count; i++) {
+        if (contradicts(&cand, &constraints[i])) {
+            fprintf(stderr, "[M1102] will+now conflict on '%s': ", var);
+            /* Describe the existing constraint */
+            fprintf(stderr, "%s ", constraints[i].kind ? "will" : "now");
+            fprintf(stderr, "%s %s %lld", var,
+                constraints[i].op == OP_EQ ? "==" :
+                constraints[i].op == OP_NEQ ? "!=" :
+                constraints[i].op == OP_LT ? "<" :
+                constraints[i].op == OP_GT ? ">" :
+                constraints[i].op == OP_LE ? "<=" : ">=",
+                (long long)constraints[i].val);
+            /* Describe the new constraint */
+            fprintf(stderr, " and ");
+            fprintf(stderr, "%s ", kind ? "will" : "now");
+            fprintf(stderr, "%s %s %lld\n", var,
+                op == OP_EQ ? "==" :
+                op == OP_NEQ ? "!=" :
+                op == OP_LT ? "<" :
+                op == OP_GT ? ">" :
+                op == OP_LE ? "<=" : ">=",
+                (long long)val);
+            return 1;
+        }
+    }
+
+    /* No contradiction – record the constraint */
+    PGConstraint *c = &constraints[constraint_count++];
+    strncpy_s(c->var, sizeof(c->var), var, _TRUNCATE);
+    c->op   = (int)op;
+    c->val  = val;
+    c->kind = (int)kind;
+    return 0;
+}
+
+void phase_graph_constraint_reset(void) {
+    constraint_count = 0;
 }
 
 static void print_location_hint(int line, int col) {

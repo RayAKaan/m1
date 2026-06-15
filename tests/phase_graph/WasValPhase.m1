@@ -1,3 +1,7 @@
+-- Week 2 Feature 3: value-named phases.
+-- `was x.5` folds to 1 because x is initialized to 5.
+-- The phase graph records the integer value as a phase name.
+-- Expected: exit code 1 (was x.5 == true)
 module Main {
     do main() -> Int {
         set live x : Int = 5;

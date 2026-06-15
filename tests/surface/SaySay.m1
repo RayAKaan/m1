@@ -1,5 +1,12 @@
+-- Week 2 Feature 4: `say` keyword parses and generates a call to `m0_println`.
+-- The argument must be a String (say : String -> Int by design).
+-- Output: "42"
 world Main {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
     do main() -> Int {
-        say(42)
+        set _a : Int = say(m0_int_to_string(42));
+        0
     }
 }

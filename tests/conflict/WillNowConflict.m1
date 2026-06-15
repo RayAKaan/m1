@@ -1,0 +1,9 @@
+module Main {
+    do main() -> Int {
+        set live x : Int = 0;
+        set live x : Int = 5;
+        let _d0 : Int = will x == 5;
+        let _d1 : Int = now x < 3;
+        x
+    }
+}

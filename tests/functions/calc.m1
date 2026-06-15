@@ -1,11 +1,14 @@
 world Calc {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
     do add(a : Int, b : Int) -> Int { a + b }
     do sub(a : Int, b : Int) -> Int { a - b }
     do mul(a : Int, b : Int) -> Int { a * b }
     do main() -> Int {
-        set _ : Int = say(int_to_string(add(10, 20)));
-        set _ : Int = say(int_to_string(sub(50, 17)));
-        set _ : Int = say(int_to_string(mul(6, 7)));
+        set _ : Int = say(m0_int_to_string(add(10, 20)));
+        set _ : Int = say(m0_int_to_string(sub(50, 17)));
+        set _ : Int = say(m0_int_to_string(mul(6, 7)));
         0
     }
 }

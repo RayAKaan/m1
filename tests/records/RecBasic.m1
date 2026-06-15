@@ -1,0 +1,7 @@
+module Main {
+    type Point = { x : Int, y : Int }
+    do main() -> Int {
+        set p : Point = { x = 3, y = 5 };
+        p.x
+    }
+}

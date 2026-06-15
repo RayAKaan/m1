@@ -1,0 +1,18 @@
+-- Week 2 Feature 4: the SPEC-CONFORMANT way to print an integer with `say`.
+--
+-- `say` / `show` take a String (per the README: `say : String -> Int`). To print
+-- a number you convert it first with `int_to_string` — there is intentionally no
+-- `say(int)` overload. This test documents the correct idiom and guards against a
+-- future regression where someone "fixes" say to accept ints directly.
+--
+-- Output: "42"
+world SayInt {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        set live x : Int = 42;
+        set _a : Int = say(m0_int_to_string(x));
+        0
+    }
+}

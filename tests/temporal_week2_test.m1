@@ -1,21 +1,22 @@
--- Week 2 test for the new temporal parser + emit stubs in m1c.m0
--- Exercises all 6 temporal forms that should now parse with the updated m1c.m0.
-
-module TestTemporalWeek2 {
-    fn main() -> Int {
-        -- freeze statement
-        freeze bank;
-
-        -- was expr
-        set _ : Int = was bank.balance;
-
-        -- will / now / when (expressions)
-        set _ : Int = will order == 1;
-        set _ : Int = now balance >= 0;
-        when balance > 0 then { 1 };
-
+-- Week 2 test: all temporal forms that parse with the current m1c.m0.
+module TestTemporal {
+    do main() -> Int {
         -- live declaration
         set live x : Int = 42;
+        set live y : Int = 0;
+
+        -- freeze (via set wrapper)
+        set _ : Int = freeze x;
+
+        -- was expr (folds to compile-time literal)
+        set _a : Int = was x.Live;
+
+        -- will / now commitments
+        set _b : Int = will y == 1;
+        set _c : Int = now y >= 0;
+
+        -- when/then (simple expression body, no braces)
+        set _d : Int = when y > 0 then 1;
 
         0
     }

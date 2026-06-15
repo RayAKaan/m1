@@ -191,44 +191,59 @@ paper/        Research paper + frozen evidence (paper/evidence/)
 **Bootstrap chain:** `m0c.exe` (C) compiles `.m0` → `m1c.exe` (M0) compiles `.m1`
 to C → clang links against `m0_runtime.c` → final executable.
 
-## Known Limitations (as of v0.6 work in progress)
+## Status (v0.6, updated 2026-06-14)
 
-M1 is still early. The following limitations are actively being worked on as part of the v0.6 "Credible Prototype" effort (see `ROADMAP_v0.6.md`).
+Most of what this section used to list as "gaps" now works in the self-hosted
+compiler (`src/m1/m1c.m0`), not just the C bootstrap. Reproduce everything below from
+scratch on Linux/macOS (gcc/clang) or Windows (clang):
 
-### Core Semantic Gaps (Being Closed in v0.6)
+```bash
+bash src/m1/build_selfhost.sh
+```
 
-- **Phase Graph integration is incomplete**  
-  The Phase Graph (the project's main technical contribution for compile-time `was` folding and phase tracking) exists as a solid standalone C module. Full integration into the self-hosted compiler (`m1c.m0`) is the highest priority item for v0.6. Until this is complete, many `was` results are not statically folded.
+This builds the bootstrap m0c from C, uses it to compile m1c.m0 into a working
+self-hosted m1c, then compiles and runs the full temporal test suite (13/13).
 
-- **`now` invariants are not yet re-checked after mutation** (Q1)  
-  A `now balance >= 0;` check is currently only emitted at the declaration site. Subsequent assignments do not automatically re-validate the invariant. This is one of the most important semantic gaps and is scheduled for v0.6.
+### Now working in the self-hosted compiler ✅
 
-- **Self-hosting is still fragile**  
-  The self-hosted compiler (`m1c`) has historically crashed with stack overflow when compiling its own source (`src/m1/m1c.m0`). Significant progress is expected in v0.6 (via stack improvements, reduced recursion, or hybrid bootstrap strategies), but it may not be 100% seamless yet.
+- **Self-hosting** — m0c compiles m1c.m0 to a working m1c with 0 errors. The
+  old "stack overflow" was a chain of concrete bugs (token misalignment, brace-chain
+  off-by-ones, missing token-skips in parse_module/parse_decl/freeze/let live,
+  a () -> Int extern, and a non-advancing error path that looped forever). All fixed.
+- **Phase Graph was folding** — `was x.Phase` folds to a compile-time literal when
+  statically decidable (was x.Live → 1, was x.Used after freeze → 0), and falls
+  back to a runtime `phase_graph_query(...)` when undecidable.
+- **Value-named phases** — `was x.1` works after `x = 1`; the assigned integer value is
+  recorded as the phase, and history is retained (was x.5 stays true after moving on).
+- **`now` re-check after mutation** (was Q1) — `now C` is re-checked after every
+  assignment to a tracked variable; a violation prints `[M1100] now invariant violated`.
+- **`will` return guard** — `will C` is enforced at function return; if never satisfied
+  (at the site or by a later mutation) it prints `[M1101] will commitment unmet`.
+- **`freeze`** — recorded in the Phase Graph (terminal phase), used by `was` folding.
+- **`world`/`do`/`set`/`say`/`show` surface syntax** — the canonical README dialect now
+  parses (world=module, do=fn, set [live]=let [live], say=m0_println, show=m0_print).
 
-- **Basic `will` + `now` conflict detection is missing** (Q3)  
-  It is currently possible to write contradictory combinations of `will` commitments and `now` invariants without any warning or error. This will be addressed (at least at a warning level) as part of Phase Graph integration.
+See `notes/phase1-week1.md` and `notes/phase1-week2.md` for the per-feature changelog
+and verification, and `paper/evidence/test-results.md` for the test matrix.
 
-### Ergonomics & Completeness
+### Remaining gaps / honest caveats
 
-- Error messages are still rough in many cases.
-- Some advanced temporal features (full interprocedural analysis, user-defined phases, etc.) are explicitly M2 work.
-- The toolchain is currently easiest to use on Windows. Linux/macOS support is improving but not yet first-class.
+- `say`/`show` take `String` by design (`say : String -> Int`); print a number with
+  `say(int_to_string(x))`. There is intentionally no `say(int)` overload (ergonomic
+  auto-coercion is a candidate for a later cycle).
+- `will` + `now` conflict detection (Q3) exists in the standalone Phase Graph C
+  module but is not yet wired into the self-hosted return-guard path.
+- `pick`/`shape` keywords lex but have no self-hosted parser productions yet.
+- `now`/`will` re-checks are coarse — every assignment re-checks all active
+  invariants/commitments (correct, but not per-variable scoped).
+- Error messages are still rough; advanced temporal features (full interprocedural
+  analysis, user-defined phases) remain M2 work.
+- Verified on Linux/gcc and Windows/clang; the in-repo `m1c.exe` is a Windows build.
 
-### What v0.6 Is Trying to Deliver
-
-By the end of the v0.6 cycle we aim to have:
-- The Phase Graph actually participating in compilation (with visible constant folding for `was`)
-- `now` invariants being re-checked after mutation
-- Self-hosting working on the compiler's own source (possibly with some caveats)
-- Bare expression statements
-- All existing temporal tests still passing, plus new tests that demonstrate the integrated behavior
-
-See `ROADMAP_v0.6.md` and the five open gap issues for the current detailed plan.
-
-**Honesty note:** We are deliberately keeping this section visible and up-to-date. The goal is to make the gap between the paper's vision and the delivered compiler as small and transparent as possible.
-
-Full details (including the 5 documented codegen gaps) are in `paper/evidence/test-results.md`.
+**Honesty note:** This section is kept deliberately current. The aim is to make the gap
+between the paper's vision and the delivered compiler as small and transparent as
+possible — and as of v0.6 Week 2 that gap is small: the five temporal operators are
+implemented and tested in the self-hosted artifact.
 
 ## License
 

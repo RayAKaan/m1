@@ -1,6 +1,9 @@
 world Test {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
     do double_it(x : Int) -> Int { x + x }
     do main() -> Int {
-        say(int_to_string(double_it(21)))
+        say(m0_int_to_string(double_it(21)))
     }
 }
