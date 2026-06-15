@@ -74,6 +74,7 @@ typedef struct {
 
 static VarState vars[MAX_VARS];
 static int var_count;
+static int branch_depth;
 
 /* -------------------------------------------------------------------
  * Helpers
@@ -469,7 +470,7 @@ static void record_now(const char *var, const char *phase, int line, int col) {
  * (Item 2). Each constraint records a (var, op, literal, kind) tuple
  * from `will C` or `now C` where C is `var op literal`.
  * ------------------------------------------------------------------ */
-#define MAX_CONSTRAINTS 64
+#define MAX_CONSTRAINTS 128
 
 typedef struct {
     char   var[64];
@@ -671,7 +672,16 @@ int64_t phase_graph_will_check(const char *var, const char *phase) {
 void phase_graph_init(void) {
     memset(vars, 0, sizeof(vars));
     var_count = 0;
+    branch_depth = 0;
     reset_commitments();
+}
+
+void phase_graph_enter_branch(void) {
+    branch_depth++;
+}
+
+void phase_graph_exit_branch(void) {
+    if (branch_depth > 0) branch_depth--;
 }
 
 void phase_graph_build(int64_t body_node) {
@@ -686,6 +696,14 @@ int phase_graph_query(const char *var, const char *phase) {
         return 0;
     }
     const VarState *v = &vars[vi];
+
+    /* unknown takes priority: if tracking is lost, return -1 (runtime fallback) */
+    if (v->unknown) {
+#ifdef PG_DEBUG
+        fprintf(stderr, "[PG] was %s.%s → -1 (unknown)\n", var, phase);
+#endif
+        return -1;
+    }
 
     /* special: "live" phase – was x.live means "was this var ever assigned?" */
     if (strcmp(phase, "live") == 0) {
@@ -705,14 +723,6 @@ int phase_graph_query(const char *var, const char *phase) {
 #endif
             return 1;
         }
-    }
-
-    /* if unknown, fall back to runtime */
-    if (v->unknown) {
-#ifdef PG_DEBUG
-        fprintf(stderr, "[PG] was %s.%s → -1 (unknown)\n", var, phase);
-#endif
-        return -1;
     }
 
     /* if terminal and phase never seen nor reachable, definitely false */
@@ -737,6 +747,10 @@ int64_t phase_graph_record(const char *var, const char *phase) {
     int vi = add_var(var);
     if (vi < 0) return 0;
     VarState *v = &vars[vi];
+    if (branch_depth > 0) {
+        v->unknown = 1;
+        return 1;
+    }
     add_phase(v, phase);
     if (v->has_cur) {
         add_edge(v, v->cur_phase, phase);

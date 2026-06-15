@@ -1,0 +1,10 @@
+# Preserve files byte-for-byte, stop spurious BOM/EOL normalization.
+# stress_m1.c / tc_m1.c have a UTF-8 BOM that some tooling strips on touch.
+src/m1/stress_m1.c -text
+src/m1/tc_m1.c     -text
+
+# Golden self-hosted compiler binary is intentionally tracked; mark binary.
+src/m1/m1c.exe binary
+
+# Shell build scripts must stay LF for Linux/macOS CI.
+*.sh text eol=lf

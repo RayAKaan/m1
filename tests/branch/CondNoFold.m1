@@ -1,0 +1,7 @@
+module Main {
+    do main() -> Int {
+        set live x : Int = 0;
+        let _ : Int = when 1 == 0 then { x = 1 };
+        was x.1
+    }
+}

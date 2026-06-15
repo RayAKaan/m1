@@ -27,6 +27,8 @@ module M1C {
     external "phase_graph_now_recheck_get_node" : Int -> Int
     external "phase_graph_constraint_check" : String -> Int -> Int -> Int -> Int
     external "phase_graph_constraint_reset" : Unit -> Int
+    external "phase_graph_enter_branch" : Unit -> Int
+    external "phase_graph_exit_branch" : Unit -> Int
 
     fn pg_init() -> Int { phase_graph_init(()) }
     fn pg_record(v : String, p : String) -> Int { phase_graph_record(v, p) }
@@ -40,6 +42,8 @@ module M1C {
         phase_graph_constraint_check(var, op, val, kind)
     }
     fn pg_constraint_reset() -> Int { phase_graph_constraint_reset(()) }
+    fn pg_enter_branch() -> Int { phase_graph_enter_branch(()) }
+    fn pg_exit_branch() -> Int { phase_graph_exit_branch(()) }
 
     type M1Token = { kind : Int, line : Int, col : Int, int_val : Int, str_val : String }
     type M1Lexer = { src : String, pos : Int, line : Int, col : Int }
@@ -746,21 +750,18 @@ module M1C {
         } else {
         if k == TK_IF {
             let cr : PR = parse_expr(ps_adv(s));
-            let s2 : PS = ps_adv(cr.st);
-            let tr : PR = parse_expr(s2);
-            let s3 : PS = ps_adv(tr.st);
-            let er : PR = if ps_kind(s3) == TK_ELSE {
-                if ps_kind(ps_adv(s3)) == TK_LBRACE {
-                    let r : PR = parse_expr(ps_adv(s3));
+            let tr : PR = parse_expr(cr.st);
+            let er : PR = if ps_kind(tr.st) == TK_ELSE {
+                if ps_kind(ps_adv(tr.st)) == TK_LBRACE {
+                    let r : PR = parse_expr(ps_adv(tr.st));
                     mk_pr(r.node, ps_adv(r.st))
-                } else { parse_expr(ps_adv(s3)) }
-            } else { mk_pr(n_unit(line, col), s3) };
+                } else { parse_expr(ps_adv(tr.st)) }
+            } else { mk_pr(n_unit(line, col), tr.st) };
             mk_pr(n_if(cr.node, tr.node, er.node, line, col), er.st)
         } else {
         if k == TK_WHILE {
             let cr : PR = parse_expr(ps_adv(s));
-            let s2 : PS = ps_adv(cr.st);
-            let br : PR = parse_expr(s2);
+            let br : PR = parse_expr(cr.st);
             mk_pr(n_while(cr.node, br.node, line, col), br.st)
         } else {
         if k == TK_FREEZE {
@@ -806,16 +807,29 @@ module M1C {
             mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
         } else {
         if k == TK_LBRACE {
-            -- Disambiguate a record literal `{ name = ... }` from a block `{ expr }`.
-            -- A record starts with an identifier immediately followed by `=`.
-            -- Anything else is a brace-delimited block whose value is the inner
-            -- expression (needed for `when C then { B }`).
+            -- Disambiguate:
+            --   { name = value , ... } → record literal
+            --   { name = value }        → single-assignment block (N_ASSIGN)
+            --   { expr }                → brace-delimited block
             let s_in : PS = ps_adv(s);
-            let is_record : Int = if ps_kind(s_in) == TK_IDENT {
-                if ps_kind(ps_adv(s_in)) == TK_EQ { 1 } else { 0 }
-            } else { 0 };
-            if is_record == 1 { gather_field_inits(s_in, m0_nil, line, col) }
-            else { let br : PR = parse_expr(s_in); mk_pr(br.node, ps_adv(br.st)) }
+            if ps_kind(s_in) == TK_IDENT /\ ps_kind(ps_adv(s_in)) == TK_EQ {
+                let nm : String = ps_str(s_in);
+                let s_after_eq : PS = ps_adv(ps_adv(s_in));
+                let vr : PR = parse_expr(s_after_eq);
+                if ps_kind(vr.st) == TK_COMMA {
+                    let f : Int = mk_fi(nm, vr.node);
+                    gather_field_inits(ps_adv(vr.st), m0_cons(f, m0_nil), line, col)
+                } else {
+                if ps_kind(vr.st) == TK_RBRACE {
+                    mk_pr(n_assign(nm, vr.node, line, col), ps_adv(vr.st))
+                } else {
+                    let br : PR = parse_expr(s_in);
+                    mk_pr(br.node, ps_adv(br.st))
+                }}
+            } else {
+                let br : PR = parse_expr(s_in);
+                mk_pr(br.node, ps_adv(br.st))
+            }
         } else {
         if k == TK_LBRACK { gather_list_elems(ps_adv(s), m0_nil) } else {
         if k == TK_LPAREN {
@@ -1198,17 +1212,23 @@ module M1C {
             let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(" ? (");
+            let _pg0 : Int = pg_enter_branch();
             let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+            let _pg1 : Int = pg_exit_branch();
             let _p4 : Int = m0_print(") : (");
+            let _pg2 : Int = pg_enter_branch();
             let el : Int = m0_get(e, 5);
             let _p5 : Int = if el != 0 { emit_c_expr(reg, el) } else { m0_print("0") };
+            let _pg3 : Int = pg_exit_branch();
             m0_print("))")
         } else {
         if k == N_MATCH {
             let _p0 : Int = m0_print("({ int64_t _m = ");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print("; ");
+            let _pg0 : Int = pg_enter_branch();
             let _p3 : Int = emit_c_expr_arms_ea(reg, m0_get(e, 4), 1);
+            let _pg1 : Int = pg_exit_branch();
             m0_print("; })")
         } else {
         if k == N_RECORD {
@@ -1220,7 +1240,9 @@ module M1C {
             let _p0 : Int = m0_print("({ while (");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(") { ");
+            let _pg0 : Int = pg_enter_branch();
             let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+            let _pg1 : Int = pg_exit_branch();
             m0_print("; } 0; })")
         } else {
         if k == N_ASSIGN {
@@ -1319,7 +1341,9 @@ module M1C {
             let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(" ? ");
+            let _pg0 : Int = pg_enter_branch();
             let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+            let _pg1 : Int = pg_exit_branch();
             m0_print(" : 0)")
         } else {
             m0_print("0")

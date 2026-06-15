@@ -45,25 +45,35 @@ Live values are tracked through a phase graph; triggers and commitments are
 checked on every mutation. The `was` operator compiles to a constant when the
 answer is statically known.
 
-## Install (Build from Source)
+## Build & Test (from source)
 
-**Requirements:** Windows, clang on PATH.
+**Recommended (Linux/macOS, gcc or clang):** one command builds the whole
+bootstrap chain and runs the temporal test suite:
 
-```powershell
+```bash
 git clone https://github.com/RayAKaan/m1
 cd m1
-
-# Step 1 — build the M0 bootstrap compiler
-cd src
-build.bat                          # produces m0c.exe
-
-# Step 2 — build the m1 driver
-clang -std=gnu11 -o m1\m1.exe m1.c m1\m0_runtime.c
-cd ..
+bash src/m1/build_selfhost.sh      # m0c -> m1c -> compile+run all tests
 ```
 
-The `m1` driver is now at `src\m1\m1.exe`. Either add it to your PATH or
-invoke it by full path.
+This builds the C bootstrap (m0c) from source, uses it to compile the self-hosted
+compiler `m1c.m0` into a working `m1c`, then compiles and runs every test,
+printing a final `RESULT: PASS/FAIL` and exiting non-zero on any failure.
+This is exactly what CI runs.
+
+To compile a single program with the self-hosted compiler:
+
+```bash
+M1_SOURCE=path/to/program.m1 /tmp/m1build/m1c > out.c
+gcc -std=gnu11 -include src/m1/compat.h -o out out.c \
+    src/m1/m0_runtime.c src/m1/phase_graph.c
+./out
+```
+
+**Windows (clang):** the legacy flow (`src/build.bat` to build `m0c.exe`, then
+`tests/build/run_tests.ps1`) still exists but is superseded by
+`build_selfhost.sh`. The in-repo `src/m1/m1c.exe` is a convenience binary and
+may lag the current `m1c.m0` source; prefer building from source.
 
 ## Usage
 
@@ -72,12 +82,6 @@ m1 run <file.m1>       Compile and run
 m1 build <file.m1>     Compile to executable
 m1 check <file.m1>     Check syntax only
 m1 version             Print version
-```
-
-## Run the Test Suite
-
-```powershell
-tests\build\run_tests.ps1
 ```
 
 ## Language Tour
@@ -191,7 +195,7 @@ paper/        Research paper + frozen evidence (paper/evidence/)
 **Bootstrap chain:** `m0c.exe` (C) compiles `.m0` → `m1c.exe` (M0) compiles `.m1`
 to C → clang links against `m0_runtime.c` → final executable.
 
-## Status (v0.6, updated 2026-06-14)
+## Status (v0.6, updated 2026-06-15)
 
 Most of what this section used to list as "gaps" now works in the self-hosted
 compiler (`src/m1/m1c.m0`), not just the C bootstrap. Reproduce everything below from
@@ -202,7 +206,8 @@ bash src/m1/build_selfhost.sh
 ```
 
 This builds the bootstrap m0c from C, uses it to compile m1c.m0 into a working
-self-hosted m1c, then compiles and runs the full temporal test suite (13/13).
+self-hosted m1c, then compiles and runs the full temporal test suite (17/17).
+CI runs this exact pipeline on every push.
 
 ### Now working in the self-hosted compiler ✅
 
@@ -219,31 +224,40 @@ self-hosted m1c, then compiles and runs the full temporal test suite (13/13).
   assignment to a tracked variable; a violation prints `[M1100] now invariant violated`.
 - **`will` return guard** — `will C` is enforced at function return; if never satisfied
   (at the site or by a later mutation) it prints `[M1101] will commitment unmet`.
+- **`will`+`now` conflict detection** — `will x==5` followed by `now x<3` triggers
+  compile-time warning `[M1102]` via literal-bounds contradiction analysis.
+- **Branch-aware phase tracking** — assignments inside conditionals no longer
+  produce wrong `was` folds; soundness verified (CondNoFold vs StraightFold tests).
 - **`freeze`** — recorded in the Phase Graph (terminal phase), used by `was` folding.
+- **Records** — type declarations, record literals `{ x = 3, y = 7 }`, field access,
+  records as function parameters.
+- **Function parameters** — previously fundamentally broken (only zero-arg `main()`
+  worked); now functions take parameters correctly.
 - **`world`/`do`/`set`/`say`/`show` surface syntax** — the canonical README dialect now
   parses (world=module, do=fn, set [live]=let [live], say=m0_println, show=m0_print).
 
-See `notes/phase1-week1.md` and `notes/phase1-week2.md` for the per-feature changelog
-and verification, and `paper/evidence/test-results.md` for the test matrix.
+See `notes/phase1-week1.md`, `notes/phase1-week2.md`, and `notes/phase1-week3.md` for
+the per-feature changelog and verification, and `paper/evidence/test-results.md` for
+the test matrix.
 
 ### Remaining gaps / honest caveats
 
 - `say`/`show` take `String` by design (`say : String -> Int`); print a number with
   `say(int_to_string(x))`. There is intentionally no `say(int)` overload (ergonomic
   auto-coercion is a candidate for a later cycle).
-- `will` + `now` conflict detection (Q3) exists in the standalone Phase Graph C
-  module but is not yet wired into the self-hosted return-guard path.
 - `pick`/`shape` keywords lex but have no self-hosted parser productions yet.
 - `now`/`will` re-checks are coarse — every assignment re-checks all active
   invariants/commitments (correct, but not per-variable scoped).
+- Conditional `was` is conservative (sound but under-approximating at runtime)
+  pending genuine runtime phase tracking.
 - Error messages are still rough; advanced temporal features (full interprocedural
   analysis, user-defined phases) remain M2 work.
-- Verified on Linux/gcc and Windows/clang; the in-repo `m1c.exe` is a Windows build.
+- CI is Linux-only (the verified pipeline); Windows CI remains a manual step.
 
 **Honesty note:** This section is kept deliberately current. The aim is to make the gap
 between the paper's vision and the delivered compiler as small and transparent as
-possible — and as of v0.6 Week 2 that gap is small: the five temporal operators are
-implemented and tested in the self-hosted artifact.
+possible — and as of v0.6 Weeks 1-3 that gap is small: the five temporal operators are
+implemented, tested, and free of soundness bugs in the self-hosted artifact.
 
 ## License
 

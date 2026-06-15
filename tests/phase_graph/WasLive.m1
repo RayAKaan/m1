@@ -1,0 +1,6 @@
+module WasLive {
+    do main() -> Int {
+        set live x : Int = 42;
+        was x.Live
+    }
+}

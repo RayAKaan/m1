@@ -7,43 +7,33 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: powershell
+  selfhost-linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup clang (via LLVM)
-        uses: llvm/actions/install-llvm@latest
-        with:
-          version: 18
-          directory: C:\Program Files\LLVM
-
-      - name: Add LLVM to PATH
-        run: echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
-
-      - name: Verify clang
-        run: clang --version
-
-      - name: Run M1 test suite
-        working-directory: tests/build
+      - name: Install toolchain
         run: |
-          powershell -ExecutionPolicy Bypass -File run_tests.ps1 `
-            -M1cPath "../../src/m1/m1c.exe" `
-            -M0RuntimeObj "../../src/m1/m0_runtime_core.obj" `
-            -InjectPy "../../src/m1/inject_test.py" `
-            -TestRoot "../../tests" `
-            -WorkDir "../../src/m1" `
-            || exit 1
+          sudo apt-get update
+          sudo apt-get install -y gcc python3
 
-      - name: Upload generated artifacts on failure
+      - name: Show versions
+        run: |
+          gcc --version
+          python3 --version
+
+      - name: Build self-hosted m1c and run test suite
+        run: |
+          chmod +x src/m1/build_selfhost.sh
+          bash src/m1/build_selfhost.sh
+
+      - name: Upload generated C on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
+          name: selfhost-artifacts
           path: |
-            src/m1/_test_*.*
-            src/m1/_inj_*.m1
+            /tmp/m1build/*.c
+            /tmp/m1build/*.err
           retention-days: 7
+          if-no-files-found: ignore

@@ -5,7 +5,7 @@ static int sv_eq(const char *a, int alen, const char *b, int blen) {
     return alen == blen && memcmp(a, b, alen) == 0;
 }
 
-static Node *reduce(Node *n, Reducer *r);
+/* fwd-decl removed: matches non-static decl in reduce.h */
 
 static long long eval_int_binop(BinaryOp op, long long a, long long b) {
     switch (op) {
@@ -222,7 +222,7 @@ static Node *subst(Node *body, const char *name, int name_len, Node *val, Arena 
     }
 }
 
-static Node *reduce(Node *n, Reducer *r) {
+Node *reduce(Node *n, Reducer *r) {
     if (!n) return NULL;
 
     switch (n->kind) {
