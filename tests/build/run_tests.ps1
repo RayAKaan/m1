@@ -33,8 +33,9 @@ function Run-Test {
         return $false
     }
 
-    # Step 2: Compile with m1c
-    $compileOut = & $M1cPath $injPath 2>&1
+    # Step 2: Compile with m1c (self-hosted m1c reads from M1_SOURCE env var)
+    $env:M1_SOURCE = $injPath
+    $compileOut = & $M1cPath 2>&1
     $compileOk = $LASTEXITCODE -eq 0
 
     if ($ExpectCompileError) {

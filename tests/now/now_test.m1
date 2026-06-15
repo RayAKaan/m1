@@ -1,12 +1,12 @@
-world NowTest {
+module NowTest {
     external "m0_println" : String -> Int
     external "m0_int_to_string" : Int -> String
 
-    do main() -> Int {
-        set live balance : Int = 1000;
-        set _ : Int = now balance >= 0;
-        set _ : Int = say(int_to_string(balance));
-        set _ : Int = balance = balance - 500;
-        say(int_to_string(balance))
+    fn main() -> Int {
+        let live balance : Int = 1000 in
+        let _ : Int = now balance >= 0 in
+        let _ : Int = m0_println(m0_int_to_string(balance)) in
+        let _ : Int = balance = balance - 500 in
+        m0_println(m0_int_to_string(balance))
     }
 }

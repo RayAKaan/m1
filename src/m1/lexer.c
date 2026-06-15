@@ -495,119 +495,119 @@ is_space(c)) {
 M1Token keyword_or_ident(char* s, int64_t line, int64_t col) {
   if 
 (m0_string_eq(s, "module") == 1) {    
-    return mk_tok(TkModule(), line, col);  
+    return mk_str_tok(TkModule(), s, line, col);  
   } else {    
         if 
 (m0_string_eq(s, "type") == 1) {      
-      return mk_tok(TkType(), line, col);    
+      return mk_str_tok(TkType(), s, line, col);    
     } else {      
             if 
 (m0_string_eq(s, "fn") == 1) {        
-        return mk_tok(TkFn(), line, col);      
+        return mk_str_tok(TkFn(), s, line, col);      
       } else {        
                 if 
 (m0_string_eq(s, "let") == 1) {          
-          return mk_tok(TkLet(), line, col);        
+          return mk_str_tok(TkLet(), s, line, col);        
         } else {          
                     if 
 (m0_string_eq(s, "match") == 1) {            
-            return mk_tok(TkMatch(), line, col);          
+            return mk_str_tok(TkMatch(), s, line, col);          
           } else {            
                         if 
 (m0_string_eq(s, "if") == 1) {              
-              return mk_tok(TkIf(), line, col);            
+              return mk_str_tok(TkIf(), s, line, col);            
             } else {              
                             if 
 (m0_string_eq(s, "else") == 1) {                
-                return mk_tok(TkElse(), line, col);              
+                return mk_str_tok(TkElse(), s, line, col);              
               } else {                
                                 if 
 (m0_string_eq(s, "true") == 1) {                  
-                  return mk_tok(TkTrue(), line, col);                
+                  return mk_str_tok(TkTrue(), s, line, col);                
                 } else {                  
                                     if 
 (m0_string_eq(s, "false") == 1) {                    
-                    return mk_tok(TkFalse(), line, col);                  
+                    return mk_str_tok(TkFalse(), s, line, col);                  
                   } else {                    
                                         if 
 (m0_string_eq(s, "external") == 1) {                      
-                      return mk_tok(TkExternal(), line, col);                    
+                      return mk_str_tok(TkExternal(), s, line, col);                    
                     } else {                      
                                             if 
 (m0_string_eq(s, "not") == 1) {                        
-                        return mk_tok(TkNot(), line, col);                      
+                        return mk_str_tok(TkNot(), s, line, col);                      
                       } else {                        
                                                 if 
 (m0_string_eq(s, "forall") == 1) {                          
-                          return mk_tok(TkForall(), line, col);                        
+                          return mk_str_tok(TkForall(), s, line, col);                        
                         } else {                          
                                                     if 
 (m0_string_eq(s, "exists") == 1) {                            
-                            return mk_tok(TkExists(), line, col);                          
+                            return mk_str_tok(TkExists(), s, line, col);                          
                           } else {                            
                                                         if 
 (m0_string_eq(s, "mut") == 1) {                              
-                              return mk_tok(TkMut(), line, col);                            
+                              return mk_str_tok(TkMut(), s, line, col);                            
                             } else {                              
                                                             if 
 (m0_string_eq(s, "while") == 1) {                                
-                                return mk_tok(TkWhile(), line, col);                              
+                                return mk_str_tok(TkWhile(), s, line, col);                              
                               } else {                                
                                                                 if 
 (m0_string_eq(s, "freeze") == 1) {                                  
-                                  return mk_tok(TkFreeze(), line, col);                                
+                                  return mk_str_tok(TkFreeze(), s, line, col);                                
                                 } else {                                  
                                                                     if 
 (m0_string_eq(s, "now") == 1) {                                    
-                                    return mk_tok(TkNow(), line, col);                                  
+                                    return mk_str_tok(TkNow(), s, line, col);                                  
                                   } else {                                    
                                                                         if 
 (m0_string_eq(s, "was") == 1) {                                      
-                                      return mk_tok(TkWwas(), line, col);                                    
+                                      return mk_str_tok(TkWwas(), s, line, col);                                    
                                     } else {                                      
                                                                             if 
 (m0_string_eq(s, "when") == 1) {                                        
-                                        return mk_tok(TkWhen(), line, col);                                      
+                                        return mk_str_tok(TkWhen(), s, line, col);                                      
                                       } else {                                        
                                                                                 if 
 (m0_string_eq(s, "will") == 1) {                                          
-                                          return mk_tok(TkWill(), line, col);                                        
+                                          return mk_str_tok(TkWill(), s, line, col);                                        
                                         } else {                                          
                                                                                     if 
 (m0_string_eq(s, "world") == 1) {                                            
-                                            return mk_tok(TkWorld(), line, col);                                          
+                                            return mk_str_tok(TkWorld(), s, line, col);                                          
                                           } else {                                            
                                                                                         if 
 (m0_string_eq(s, "do") == 1) {                                              
-                                              return mk_tok(TkDo(), line, col);                                            
+                                              return mk_str_tok(TkDo(), s, line, col);                                            
                                             } else {                                              
                                                                                             if 
 (m0_string_eq(s, "set") == 1) {                                                
-                                                return mk_tok(TkSet(), line, col);                                              
+                                                return mk_str_tok(TkSet(), s, line, col);                                              
                                               } else {                                                
                                                                                                 if 
 (m0_string_eq(s, "pick") == 1) {                                                  
-                                                  return mk_tok(TkPick(), line, col);                                                
+                                                  return mk_str_tok(TkPick(), s, line, col);                                                
                                                 } else {                                                  
                                                                                                     if 
 (m0_string_eq(s, "shape") == 1) {                                                    
-                                                    return mk_tok(TkShape(), line, col);                                                  
+                                                    return mk_str_tok(TkShape(), s, line, col);                                                  
                                                   } else {                                                    
                                                                                                         if 
 (m0_string_eq(s, "live") == 1) {                                                      
-                                                      return mk_tok(TkLive(), line, col);                                                    
+                                                      return mk_str_tok(TkLive(), s, line, col);                                                    
                                                     } else {                                                      
                                                                                                             if 
 (m0_string_eq(s, "say") == 1) {                                                        
-                                                        return mk_tok(TkSay(), line, col);                                                      
+                                                        return mk_str_tok(TkSay(), s, line, col);                                                      
                                                       } else {                                                        
                                                                                                                 if 
 (m0_string_eq(s, "show") == 1) {                                                          
-                                                          return mk_tok(TkShow(), line, col);                                                        
+                                                          return mk_str_tok(TkShow(), s, line, col);                                                        
                                                         } else {                                                          
                                                                                                                     if 
 (m0_string_eq(s, "then") == 1) {                                                            
-                                                            return mk_tok(TkThen(), line, col);                                                          
+                                                            return mk_str_tok(TkThen(), s, line, col);                                                          
                                                           } else {                                                            
                                                             return mk_str_tok(TkIdent(), s, line, col);                                                          
                                                           }                                                        

@@ -1,0 +1,11 @@
+module NowRecheck {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    fn main() -> Int {
+        let live x : Int = 10 in
+        let _ : Int = now x >= 0 in
+        let _ : Int = x = 5 in
+        x
+    }
+}

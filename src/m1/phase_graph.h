@@ -10,6 +10,9 @@ int     phase_graph_will_query(const char *var, const char *phase);
 int64_t phase_graph_record(const char *var, const char *phase);
 int64_t phase_graph_freeze(const char *var);
 int64_t phase_graph_will_check(const char *var, const char *phase);
+int64_t phase_graph_now_recheck_declare(int64_t cond_node);
+int64_t phase_graph_now_recheck_count(void);
+int64_t phase_graph_now_recheck_get_node(int64_t idx);
 void    phase_graph_free(void);
 
 #endif

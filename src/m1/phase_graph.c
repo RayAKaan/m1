@@ -397,9 +397,19 @@ static int    will_commit_count;
 static WillCommit now_commits[MAX_COMMITS];
 static int    now_commit_count;
 
+/* -------------------------------------------------------------------
+ * Now re-check storage: condition AST node pointers.
+ * Populated during N_NOW emit, queried during N_ASSIGN emit.
+ * All stored conditions are re-checked after every mutation.
+ * ------------------------------------------------------------------ */
+#define MAX_RECHECK_NODES 256
+static int64_t recheck_cond_nodes[MAX_RECHECK_NODES];
+static int     recheck_count;
+
 static void reset_commitments(void) {
     will_commit_count = 0;
     now_commit_count  = 0;
+    recheck_count     = 0;
 }
 
 static int is_will_committed(const char *var, const char *phase) {
@@ -456,6 +466,21 @@ static int find_now_conflict(const char *var, const char *phase) {
             strcmp(now_commits[i].phase, phase) == 0)
             return i;
     return -1;
+}
+
+int64_t phase_graph_now_recheck_declare(int64_t cond_node) {
+    if (recheck_count >= MAX_RECHECK_NODES) return 0;
+    recheck_cond_nodes[recheck_count++] = cond_node;
+    return 0;
+}
+
+int64_t phase_graph_now_recheck_count(void) {
+    return recheck_count;
+}
+
+int64_t phase_graph_now_recheck_get_node(int64_t idx) {
+    if (idx >= 0 && idx < recheck_count) return recheck_cond_nodes[idx];
+    return 0;
 }
 
 /* -------------------------------------------------------------------

@@ -128,35 +128,35 @@ module M1Lexer {
     }
 
     fn keyword_or_ident(s : String, line : Int, col : Int) -> M1Token {
-        if m0_string_eq(s, "module") == 1 { mk_tok(TkModule, line, col) } else {
-        if m0_string_eq(s, "type") == 1 { mk_tok(TkType, line, col) } else {
-        if m0_string_eq(s, "fn") == 1 { mk_tok(TkFn, line, col) } else {
-        if m0_string_eq(s, "let") == 1 { mk_tok(TkLet, line, col) } else {
-        if m0_string_eq(s, "match") == 1 { mk_tok(TkMatch, line, col) } else {
-        if m0_string_eq(s, "if") == 1 { mk_tok(TkIf, line, col) } else {
-        if m0_string_eq(s, "else") == 1 { mk_tok(TkElse, line, col) } else {
-        if m0_string_eq(s, "true") == 1 { mk_tok(TkTrue, line, col) } else {
-        if m0_string_eq(s, "false") == 1 { mk_tok(TkFalse, line, col) } else {
-        if m0_string_eq(s, "external") == 1 { mk_tok(TkExternal, line, col) } else {
-        if m0_string_eq(s, "not") == 1 { mk_tok(TkNot, line, col) } else {
-        if m0_string_eq(s, "forall") == 1 { mk_tok(TkForall, line, col) } else {
-        if m0_string_eq(s, "exists") == 1 { mk_tok(TkExists, line, col) } else {
-        if m0_string_eq(s, "mut") == 1 { mk_tok(TkMut, line, col) } else {
-        if m0_string_eq(s, "while") == 1 { mk_tok(TkWhile, line, col) } else {
-        if m0_string_eq(s, "freeze") == 1 { mk_tok(TkFreeze, line, col) } else {
-        if m0_string_eq(s, "now") == 1 { mk_tok(TkNow, line, col) } else {
-        if m0_string_eq(s, "was") == 1 { mk_tok(TkWwas, line, col) } else {
-        if m0_string_eq(s, "when") == 1 { mk_tok(TkWhen, line, col) } else {
-        if m0_string_eq(s, "will") == 1 { mk_tok(TkWill, line, col) } else {
-        if m0_string_eq(s, "world") == 1 { mk_tok(TkWorld, line, col) } else {
-        if m0_string_eq(s, "do") == 1 { mk_tok(TkDo, line, col) } else {
-        if m0_string_eq(s, "set") == 1 { mk_tok(TkSet, line, col) } else {
-        if m0_string_eq(s, "pick") == 1 { mk_tok(TkPick, line, col) } else {
-        if m0_string_eq(s, "shape") == 1 { mk_tok(TkShape, line, col) } else {
-        if m0_string_eq(s, "live") == 1 { mk_tok(TkLive, line, col) } else {
-        if m0_string_eq(s, "say") == 1 { mk_tok(TkSay, line, col) } else {
-        if m0_string_eq(s, "show") == 1 { mk_tok(TkShow, line, col) } else {
-        if m0_string_eq(s, "then") == 1 { mk_tok(TkThen, line, col) } else {
+        if m0_string_eq(s, "module") == 1 { mk_str_tok(TkModule, s, line, col) } else {
+        if m0_string_eq(s, "type") == 1 { mk_str_tok(TkType, s, line, col) } else {
+        if m0_string_eq(s, "fn") == 1 { mk_str_tok(TkFn, s, line, col) } else {
+        if m0_string_eq(s, "let") == 1 { mk_str_tok(TkLet, s, line, col) } else {
+        if m0_string_eq(s, "match") == 1 { mk_str_tok(TkMatch, s, line, col) } else {
+        if m0_string_eq(s, "if") == 1 { mk_str_tok(TkIf, s, line, col) } else {
+        if m0_string_eq(s, "else") == 1 { mk_str_tok(TkElse, s, line, col) } else {
+        if m0_string_eq(s, "true") == 1 { mk_str_tok(TkTrue, s, line, col) } else {
+        if m0_string_eq(s, "false") == 1 { mk_str_tok(TkFalse, s, line, col) } else {
+        if m0_string_eq(s, "external") == 1 { mk_str_tok(TkExternal, s, line, col) } else {
+        if m0_string_eq(s, "not") == 1 { mk_str_tok(TkNot, s, line, col) } else {
+        if m0_string_eq(s, "forall") == 1 { mk_str_tok(TkForall, s, line, col) } else {
+        if m0_string_eq(s, "exists") == 1 { mk_str_tok(TkExists, s, line, col) } else {
+        if m0_string_eq(s, "mut") == 1 { mk_str_tok(TkMut, s, line, col) } else {
+        if m0_string_eq(s, "while") == 1 { mk_str_tok(TkWhile, s, line, col) } else {
+        if m0_string_eq(s, "freeze") == 1 { mk_str_tok(TkFreeze, s, line, col) } else {
+        if m0_string_eq(s, "now") == 1 { mk_str_tok(TkNow, s, line, col) } else {
+        if m0_string_eq(s, "was") == 1 { mk_str_tok(TkWwas, s, line, col) } else {
+        if m0_string_eq(s, "when") == 1 { mk_str_tok(TkWhen, s, line, col) } else {
+        if m0_string_eq(s, "will") == 1 { mk_str_tok(TkWill, s, line, col) } else {
+        if m0_string_eq(s, "world") == 1 { mk_str_tok(TkWorld, s, line, col) } else {
+        if m0_string_eq(s, "do") == 1 { mk_str_tok(TkDo, s, line, col) } else {
+        if m0_string_eq(s, "set") == 1 { mk_str_tok(TkSet, s, line, col) } else {
+        if m0_string_eq(s, "pick") == 1 { mk_str_tok(TkPick, s, line, col) } else {
+        if m0_string_eq(s, "shape") == 1 { mk_str_tok(TkShape, s, line, col) } else {
+        if m0_string_eq(s, "live") == 1 { mk_str_tok(TkLive, s, line, col) } else {
+        if m0_string_eq(s, "say") == 1 { mk_str_tok(TkSay, s, line, col) } else {
+        if m0_string_eq(s, "show") == 1 { mk_str_tok(TkShow, s, line, col) } else {
+        if m0_string_eq(s, "then") == 1 { mk_str_tok(TkThen, s, line, col) } else {
         mk_str_tok(TkIdent, s, line, col)
         }}}}}}}}}}}}}}}}}}}}}}}}}}}}}
     }

@@ -15,18 +15,25 @@ module M1C {
     external "m0_nil" : Int
     external "m0_list_length" : Int -> Int
     external "m0_get_env" : String -> String
+    external "m0_int_to_string" : Int -> String
 
     external "phase_graph_init" : Unit -> Int
     external "phase_graph_record" : String -> String -> Int
     external "phase_graph_freeze" : String -> Int
     external "phase_graph_query" : String -> String -> Int
     external "phase_graph_will_check" : String -> String -> Int
+    external "phase_graph_now_recheck_declare" : Int -> Int
+    external "phase_graph_now_recheck_count" : Unit -> Int
+    external "phase_graph_now_recheck_get_node" : Int -> Int
 
     fn pg_init() -> Int { phase_graph_init(()) }
     fn pg_record(v : String, p : String) -> Int { phase_graph_record(v, p) }
     fn pg_freeze(v : String) -> Int { phase_graph_freeze(v) }
     fn pg_query(v : String, p : String) -> Int { phase_graph_query(v, p) }
     fn pg_will_check(v : String, p : String) -> Int { phase_graph_will_check(v, p) }
+    fn pg_rc_declare(n : Int) -> Int { phase_graph_now_recheck_declare(n) }
+    fn pg_rc_count() -> Int { phase_graph_now_recheck_count(()) }
+    fn pg_rc_get_node(i : Int) -> Int { phase_graph_now_recheck_get_node(i) }
 
     type M1Token = { kind : Int, line : Int, col : Int, int_val : Int, str_val : String }
     type M1Lexer = { src : String, pos : Int, line : Int, col : Int }
@@ -719,9 +726,12 @@ module M1C {
         } else {
         if k == TK_WWAS {
             let vr : PR = parse_atom(ps_adv(s));
-            -- vr.st points at '.', skip it to reach the phase name
             let s_phase : PS = ps_adv(vr.st);
-            let ph : String = ps_str(s_phase);
+            let k_phase : Int = ps_kind(s_phase);
+            let ph_str : String = ps_str(s_phase);
+            let ph : String = if k_phase == TK_INT /\ m0_string_eq(ph_str, "") == 1 {
+                m0_int_to_string(ps_int(s_phase))
+            } else { ph_str };
             mk_pr(n_was(vr.node, ph, line, col), ps_adv(s_phase))
         } else {
         if k == TK_WILL {
@@ -1014,6 +1024,20 @@ module M1C {
         "" }}
     }
 
+    -- Re-emit every registered now condition after an assignment.
+    -- i = current index, n = total count (pg_rc_count).
+    fn now_emit_rechecks(reg : Int, i : Int, n : Int) -> Int {
+        if i >= n {
+            0
+        } else {
+            let cond : Int = pg_rc_get_node(i);
+            let _p0 : Int = m0_print(", ({ if (!(");
+            let _p1 : Int = emit_c_expr(reg, cond);
+            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
+            now_emit_rechecks(reg, i + 1, n)
+        }
+    }
+
     fn emit_c_expr(reg : Int, e : Int) -> Int {
         let k : Int = m0_get(e, 0);
         if k == N_INT { m0_print_int(m0_get(e, 3)) } else {
@@ -1098,25 +1122,42 @@ module M1C {
         if k == N_ASSIGN {
             let nm : String = m0_load_string(e, 3);
             let rhs : Int = m0_get(e, 4);
-            -- Record a phase transition for this var in the Phase Graph so that
-            -- a later `was x.<phase>` can be answered. We record a generic
-            -- "set" phase (value-named phases would need int->string support
-            -- in the self-hosted runtime, which is not yet available).
             let _pg : Int = pg_record(nm, "set");
+            -- If the assigned value is a compile-time integer constant,
+            -- also record it as a phase name so `was x.<value>` queries
+            -- can be answered at compile time.
+            let rhs_k : Int = m0_get(rhs, 0);
+            let _pgv : Int = if rhs_k == N_INT {
+                pg_record(nm, m0_int_to_string(m0_get(rhs, 3)))
+            } else { 0 };
+            -- After the assignment, re-check every registered now condition.
+            -- Uses comma operator so the assignment value is followed by
+            -- side-effecting invariant checks (all conditions must hold).
+            -- Append `, name` at the end so the expression value is the
+            -- assigned variable, not the last re-check (which is always 0).
+            let rc_cnt : Int = pg_rc_count();
             let _p0 : Int = m0_print("(");
             let _p1 : Int = m0_print(nm);
             let _p2 : Int = m0_print(" = ");
             let _p3 : Int = emit_c_expr(reg, rhs);
+            let _rc : Int = now_emit_rechecks(reg, 0, rc_cnt);
+            let _p4 : Int = m0_print(", ");
+            let _p5 : Int = m0_print(nm);
             m0_print(")")
         } else {
         if k == N_LIVE {
             let nm : String = m0_load_string(e, 3);
             -- Record the lowercase "live" phase (special: "ever assigned")
             -- and a capitalized "Live" phase (the initial declared phase).
-            -- "Live" is a normal identifier and so is queryable via
-            -- `was x.Live`; the keyword `live` cannot be used after `.`.
             let _r0 : Int = pg_record(nm, "live");
             let _r1 : Int = pg_record(nm, "Live");
+            -- Record the initial value as a phase name if it's a
+            -- compile-time integer constant.
+            let init_val : Int = m0_get(e, 5);
+            let init_k : Int = m0_get(init_val, 0);
+            let _rv : Int = if init_k == N_INT {
+                pg_record(nm, m0_int_to_string(m0_get(init_val, 3)))
+            } else { 0 };
             let _p0 : Int = m0_print("({ ");
             let _p1 : Int = emit_c_type(reg, m0_get(e, 4));
             let _p2 : Int = m0_print(" ");
@@ -1159,10 +1200,13 @@ module M1C {
             m0_print(")")
         } else {
         if k == N_NOW {
-            -- now C : emit a runtime invariant assertion. (Re-check after every
-            -- mutation is Week 2 work.) Wrapped so the let has a body.
+            -- now C : emit a runtime invariant assertion + register the
+            -- condition node so the N_ASSIGN emitter can re-check it
+            -- after every subsequent mutation.
+            let cond : Int = m0_get(e, 3);
+            let _reg : Int = pg_rc_declare(cond);
             let _p0 : Int = m0_print("({ if (!(");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            let _p1 : Int = emit_c_expr(reg, cond);
             let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
             0
         } else {
