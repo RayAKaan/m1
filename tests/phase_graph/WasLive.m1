@@ -1,6 +1,11 @@
+-- Phase Graph test: lowercase keyword phase name (`was x.live`).
+-- Regression for the keyword-token str_val bug: `live` is a keyword, so its
+-- token must still carry "live" as text for the phase name. Folds to 1.
 module WasLive {
-    do main() -> Int {
-        set live x : Int = 42;
-        was x.Live
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 42;
+        m0_print_int(was x.live)
     }
 }

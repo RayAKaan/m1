@@ -1,8 +1,11 @@
-module Main {
+-- Week 3 Item 1: record passed as a function parameter + field access in callee.
+-- Output: 10  (3 + 7)
+module RecParam {
+    external "m0_print_int" : Int -> Int
     type Point = { x : Int, y : Int }
-    do dot(p : Point) -> Int { p.x + p.y }
-    do main() -> Int {
-        set p : Point = { x = 4, y = 6 };
-        dot(p)
+    fn psum(p : Point) -> Int { p.x + p.y }
+    fn main() -> Int {
+        let p : Point = { x = 3, y = 7 };
+        m0_print_int(psum(p))
     }
 }

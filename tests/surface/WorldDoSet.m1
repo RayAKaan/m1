@@ -1,9 +1,16 @@
--- Week 2 Feature 4: `world` / `do` / `set live` surface syntax.
--- Demonstrates that the canonical README dialect parses correctly.
--- No print call needed — just verifying the syntax tree.
-world Main {
+-- Week 2 Feature 4: world/do/set/say surface syntax.
+-- The canonical README dialect, now parsed by the self-hosted compiler.
+-- `world` == module, `do` == fn, `set [live] x : T = v` == let [live],
+-- `say(e)` == m0_println(e), `show(e)` == m0_print(e).
+--
+-- Exercises the full pipeline: world/do/set live + a temporal `was` query.
+-- Prints 1 (was x.Live folds to literal 1).
+world WorldDoSet {
+    external "m0_print_int" : Int -> Int
+
     do main() -> Int {
-        set live x : Int = 1;
-        x
+        set live x : Int = 42;
+        set _a : Int = m0_print_int(was x.Live);
+        0
     }
 }

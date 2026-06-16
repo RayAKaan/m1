@@ -1,6 +1,11 @@
-module Main {
-    do add3(a : Int, b : Int, c : Int) -> Int { a + b + c }
-    do main() -> Int {
-        add3(5, 6, 5)
-    }
+-- Week 3 Item 1: function parameters.
+-- Regression for a fundamental pre-existing bug: gather_params started ON the '('
+-- token instead of after it, so EVERY parameterized function emitted unnamed/extra
+-- params (e.g. `int64_t dbl(int64_t , int64_t )`) and failed to compile. Only zero-arg
+-- main() worked. Now params emit correctly.
+-- Output: 16  (dbl(3)=6 ... actually add: 10) -> we print add3(3,5,8)=16
+module FnParam {
+    external "m0_print_int" : Int -> Int
+    fn add3(a : Int, b : Int, c : Int) -> Int { a + b + c }
+    fn main() -> Int { m0_print_int(add3(3, 5, 8)) }
 }

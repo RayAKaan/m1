@@ -1,8 +1,16 @@
+-- Phase Graph test: runtime-fallback (the "-1 / undecidable" path).
+-- Self-hosted dialect (module/fn/let live). See README.md.
+--
+-- `x` is live (so it has phases) but is NOT frozen and never passed through the
+-- queried phase "Other". The compile-time Phase Graph cannot prove the answer
+-- (variable is non-terminal => pg_query returns -1), so `was x.Other` lowers to
+-- a runtime phase_graph_query("x","Other") call rather than a folded literal.
+-- At runtime that query returns 0 (phase never recorded), so the program prints 0.
 module WasRuntime {
-    do main() -> Int {
-        set live x : Int = 1;
-        set live y : Int = 2;
-        let _ : Int = if x == 0 then { 3 } else { 4 };
-        was x.1
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 0;
+        m0_print_int(was x.Other)
     }
 }

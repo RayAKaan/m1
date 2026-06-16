@@ -1,7 +1,16 @@
-module Main {
+-- Week 3 Item 1: record type declarations + literals + field access.
+-- Regression for the pre-existing crashes:
+--   (a) `type X = { ... }` decl crashed m1c (the '=' was not skipped in parse_decl)
+--   (b) record literals emitted `0` (gather_field_inits returned a bare list, never
+--       wrapped in N_RECORD; the N_RECORD emit expected a type-name at field 3)
+-- Now: typedef emits, literal emits `{ .x=.., .y=.. }`, field access works.
+-- Output: 3
+module RecBasic {
+    external "m0_print_int" : Int -> Int
     type Point = { x : Int, y : Int }
-    do main() -> Int {
-        set p : Point = { x = 3, y = 5 };
-        p.x
+
+    fn main() -> Int {
+        let p : Point = { x = 3, y = 7 };
+        m0_print_int(p.x)
     }
 }

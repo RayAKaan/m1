@@ -39,23 +39,6 @@ extern int64_t  m0_is_nil(int64_t list);
 extern int64_t  m0_head(int64_t list);
 extern int64_t  m0_tail(int64_t list);
 
-/* binary-operator kind constants (mirrors m1c.m0) */
-#define OP_ADD  0
-#define OP_SUB  1
-#define OP_MUL  2
-#define OP_DIV  3
-#define OP_MOD  4
-#define OP_EQ   5
-#define OP_NEQ  6
-#define OP_LT   7
-#define OP_GT   8
-#define OP_LE   9
-#define OP_GE   10
-#define OP_AND  11
-#define OP_OR   12
-#define OP_IMPL 13
-#define OP_IFF  14
-
 /* -------------------------------------------------------------------
  * Data structures
  * ------------------------------------------------------------------ */
@@ -82,6 +65,9 @@ typedef struct {
 
 static VarState vars[MAX_VARS];
 static int var_count;
+
+/* Branch nesting depth (Week 3 Item 3): while > 0 we are emitting inside a
+   conditional/loop body, so phase recordings are treated as uncertain. */
 static int branch_depth;
 
 /* -------------------------------------------------------------------
@@ -423,21 +409,161 @@ static int    will_commit_count;
 static WillCommit now_commits[MAX_COMMITS];
 static int    now_commit_count;
 
-/* -------------------------------------------------------------------
- * Now re-check storage: condition AST node pointers.
- * Populated during N_NOW emit, queried during N_ASSIGN emit.
- * All stored conditions are re-checked after every mutation.
- * ------------------------------------------------------------------ */
-#define MAX_RECHECK_NODES 256
+/* now re-check support (Week 2, Feature 1) — see FFI functions below */
+#define MAX_RECHECK_NODES 64
 static int64_t recheck_cond_nodes[MAX_RECHECK_NODES];
 static int     recheck_count;
+
+/* will return-guard support (Week 2, Feature 2) — condition AST nodes that must
+   hold by the end of the current function. Reset per function (via init). */
+#define MAX_WILL_NODES 64
+static int64_t will_cond_nodes[MAX_WILL_NODES];
+static int     will_cond_count;
+
+void phase_graph_constraint_reset(void);
 
 static void reset_commitments(void) {
     will_commit_count = 0;
     now_commit_count  = 0;
     recheck_count     = 0;
+    will_cond_count   = 0;
     phase_graph_constraint_reset();
 }
+
+/* -------------------------------------------------------------------
+ * now re-check support (Week 2, Feature 1)
+ *
+ * At a `now C` declaration the compiler hands us the AST node handle for
+ * the condition C via phase_graph_now_recheck_declare(). The compiler then,
+ * at each later assignment, asks how many active now-conditions exist
+ * (phase_graph_now_recheck_count) and fetches each node handle
+ * (phase_graph_now_recheck_get_node) so it can re-emit the condition as a
+ * C runtime check after the mutation. This is the "correct" re-check:
+ * the full condition expression is re-evaluated, not just reported.
+ * ------------------------------------------------------------------ */
+int64_t phase_graph_now_recheck_declare(int64_t cond_node) {
+    if (recheck_count >= MAX_RECHECK_NODES) return 0;
+    recheck_cond_nodes[recheck_count] = cond_node;
+    recheck_count++;
+    return 1;
+}
+
+int64_t phase_graph_now_recheck_count(void) {
+    return (int64_t)recheck_count;
+}
+
+int64_t phase_graph_now_recheck_get_node(int64_t i) {
+    if (i < 0 || i >= recheck_count) return 0;
+    return recheck_cond_nodes[i];
+}
+
+/* -------------------------------------------------------------------
+ * will return-guard support (Week 2, Feature 2)
+ *
+ * At a `will C` site the compiler registers the condition AST node handle.
+ * In emit_fn, just before the function returns, the compiler asks how many
+ * will-conditions are active and fetches each node to re-emit it as a guard:
+ *   if (!(C)) { fprintf(stderr,"[M1101] will commitment unmet\n"); }
+ * The registry is per-function (cleared by phase_graph_init at function entry).
+ * ------------------------------------------------------------------ */
+int64_t phase_graph_will_guard_declare(int64_t cond_node) {
+    if (will_cond_count >= MAX_WILL_NODES) return 0;
+    will_cond_nodes[will_cond_count] = cond_node;
+    will_cond_count++;
+    return 1;
+}
+
+int64_t phase_graph_will_guard_count(void) {
+    return (int64_t)will_cond_count;
+}
+
+int64_t phase_graph_will_guard_get_node(int64_t i) {
+    if (i < 0 || i >= will_cond_count) return 0;
+    return will_cond_nodes[i];
+}
+
+/* -------------------------------------------------------------------
+ * will + now conflict detection (Week 3, Item 2)
+ *
+ * The self-hosted compiler's `will`/`now` take boolean conditions, not var.Phase.
+ * For the common decidable case `op` is a comparison of a variable against an
+ * integer literal (e.g. `will x == 5`, `now x < 3`). We record each such
+ * constraint as (var, op, value, kind) and, on each new constraint, check it
+ * against all prior constraints on the same variable for a literal contradiction.
+ *
+ * op codes (match m1c.m0 OP_*): 5=EQ 6=NEQ 7=LT 8=GT 9=LE 10=GE
+ * kind: 0 = now (must hold now & after mutations), 1 = will (must eventually hold)
+ *
+ * Returns 1 if the new constraint contradicts an existing one, else 0.
+ * ------------------------------------------------------------------ */
+#define MAX_CONSTRAINTS 128
+typedef struct { char var[64]; int op; int64_t val; int kind; } Constraint;
+static Constraint constraints[MAX_CONSTRAINTS];
+static int constraint_count;
+
+/* Does a value v satisfy (op, bound)? */
+static int sat(int op, int64_t v, int64_t bound) {
+    switch (op) {
+        case 5:  return v == bound;   /* EQ  */
+        case 6:  return v != bound;   /* NEQ */
+        case 7:  return v <  bound;   /* LT  */
+        case 8:  return v >  bound;   /* GT  */
+        case 9:  return v <= bound;   /* LE  */
+        case 10: return v >= bound;   /* GE  */
+        default: return 1;
+    }
+}
+
+/* Are two single-variable constraints jointly unsatisfiable? Decided by scanning
+   a bounded integer window around the two bounds (sufficient for the comparison
+   ops above, which are monotone / point constraints). */
+static int contradicts(int op1, int64_t b1, int op2, int64_t b2) {
+    int64_t lo = (b1 < b2 ? b1 : b2) - 2;
+    int64_t hi = (b1 > b2 ? b1 : b2) + 2;
+    for (int64_t v = lo; v <= hi; v++)
+        if (sat(op1, v, b1) && sat(op2, v, b2)) return 0; /* some v satisfies both */
+    return 1; /* no value in the window satisfies both -> contradiction */
+}
+
+/* Record a (var,op,val,kind) constraint; return 1 if it contradicts a prior
+   constraint on the same variable (and emit a diagnostic), else 0. */
+int64_t phase_graph_constraint_check(const char *var, int64_t op,
+                                     int64_t val, int64_t kind) {
+    int conflict = 0;
+    for (int i = 0; i < constraint_count; i++) {
+        if (strcmp(constraints[i].var, var) != 0) continue;
+        if (contradicts((int)op, val, constraints[i].op, constraints[i].val)) {
+            const char *k_new = kind ? "will" : "now";
+            const char *k_old = constraints[i].kind ? "will" : "now";
+            fprintf(stderr,
+                "[M1102] warning: '%s %s ...' conflicts with prior '%s %s ...'\n",
+                k_new, var, k_old, var);
+            conflict = 1;
+        }
+    }
+    if (constraint_count < MAX_CONSTRAINTS) {
+        strncpy_s(constraints[constraint_count].var, 64, var, _TRUNCATE);
+        constraints[constraint_count].op   = (int)op;
+        constraints[constraint_count].val  = val;
+        constraints[constraint_count].kind = (int)kind;
+        constraint_count++;
+    }
+    return conflict;
+}
+
+void phase_graph_constraint_reset(void) { constraint_count = 0; }
+
+/* -------------------------------------------------------------------
+ * Branch-aware phase tracking (Week 3, Item 3)
+ *
+ * The compiler brackets each conditional/loop body with enter/exit so that any
+ * phase recorded inside (which may or may not execute at runtime) is treated as
+ * uncertain rather than a definite phase. This prevents `was x.P` from folding
+ * to a wrong literal when the assignment to x is conditional.
+ * ------------------------------------------------------------------ */
+void phase_graph_enter_branch(void) { branch_depth++; }
+void phase_graph_exit_branch(void)  { if (branch_depth > 0) branch_depth--; }
+
 
 static int is_will_committed(const char *var, const char *phase) {
     for (int i = 0; i < will_commit_count; i++)
@@ -473,100 +599,6 @@ static void record_now(const char *var, const char *phase, int line, int col) {
     now_commit_count++;
 }
 
-/* -------------------------------------------------------------------
- * Constraint table for will+now literal-bounds contradiction detection
- * (Item 2). Each constraint records a (var, op, literal, kind) tuple
- * from `will C` or `now C` where C is `var op literal`.
- * ------------------------------------------------------------------ */
-#define MAX_CONSTRAINTS 128
-
-typedef struct {
-    char   var[64];
-    int    op;
-    int64_t val;
-    int    kind;     /* 0 = now, 1 = will */
-} PGConstraint;
-
-static PGConstraint constraints[MAX_CONSTRAINTS];
-static int constraint_count;
-
-static int satisfies(int op, int64_t bound, int64_t test) {
-    switch (op) {
-        case OP_EQ:  return test == bound;
-        case OP_NEQ: return test != bound;
-        case OP_LT:  return test <  bound;
-        case OP_GT:  return test >  bound;
-        case OP_LE:  return test <= bound;
-        case OP_GE:  return test >= bound;
-        default:     return 1;
-    }
-}
-
-/* Returns 1 if c1 and c2 cannot both be true for the same variable value */
-static int contradicts(const PGConstraint *c1, const PGConstraint *c2) {
-    if (strcmp(c1->var, c2->var) != 0) return 0;
-    if (c1->kind == c2->kind) return 0; /* same kind cannot conflict */
-
-    int64_t lo = (c1->val < c2->val ? c1->val : c2->val) - 100;
-    int64_t hi = (c1->val > c2->val ? c1->val : c2->val) + 100;
-    if (lo < -1000000) lo = -1000000;
-    if (hi >  1000000) hi =  1000000;
-
-    for (int64_t v = lo; v <= hi; v++)
-        if (satisfies(c1->op, c1->val, v) && satisfies(c2->op, c2->val, v))
-            return 0;
-    return 1;
-}
-
-int64_t phase_graph_constraint_check(const char *var, int64_t op, int64_t val, int64_t kind) {
-    if (constraint_count >= MAX_CONSTRAINTS) return 0;
-
-    /* Check for contradiction against all existing constraints of opposite kind */
-    PGConstraint cand;
-    strncpy_s(cand.var, sizeof(cand.var), var, _TRUNCATE);
-    cand.op  = (int)op;
-    cand.val = val;
-    cand.kind = (int)kind;
-
-    for (int i = 0; i < constraint_count; i++) {
-        if (contradicts(&cand, &constraints[i])) {
-            fprintf(stderr, "[M1102] will+now conflict on '%s': ", var);
-            /* Describe the existing constraint */
-            fprintf(stderr, "%s ", constraints[i].kind ? "will" : "now");
-            fprintf(stderr, "%s %s %lld", var,
-                constraints[i].op == OP_EQ ? "==" :
-                constraints[i].op == OP_NEQ ? "!=" :
-                constraints[i].op == OP_LT ? "<" :
-                constraints[i].op == OP_GT ? ">" :
-                constraints[i].op == OP_LE ? "<=" : ">=",
-                (long long)constraints[i].val);
-            /* Describe the new constraint */
-            fprintf(stderr, " and ");
-            fprintf(stderr, "%s ", kind ? "will" : "now");
-            fprintf(stderr, "%s %s %lld\n", var,
-                op == OP_EQ ? "==" :
-                op == OP_NEQ ? "!=" :
-                op == OP_LT ? "<" :
-                op == OP_GT ? ">" :
-                op == OP_LE ? "<=" : ">=",
-                (long long)val);
-            return 1;
-        }
-    }
-
-    /* No contradiction – record the constraint */
-    PGConstraint *c = &constraints[constraint_count++];
-    strncpy_s(c->var, sizeof(c->var), var, _TRUNCATE);
-    c->op   = (int)op;
-    c->val  = val;
-    c->kind = (int)kind;
-    return 0;
-}
-
-void phase_graph_constraint_reset(void) {
-    constraint_count = 0;
-}
-
 static void print_location_hint(int line, int col) {
     fprintf(stderr, "<phase-graph>:%d:%d", line, col);
 }
@@ -587,21 +619,6 @@ static int find_now_conflict(const char *var, const char *phase) {
             strcmp(now_commits[i].phase, phase) == 0)
             return i;
     return -1;
-}
-
-int64_t phase_graph_now_recheck_declare(int64_t cond_node) {
-    if (recheck_count >= MAX_RECHECK_NODES) return 0;
-    recheck_cond_nodes[recheck_count++] = cond_node;
-    return 0;
-}
-
-int64_t phase_graph_now_recheck_count(void) {
-    return recheck_count;
-}
-
-int64_t phase_graph_now_recheck_get_node(int64_t idx) {
-    if (idx >= 0 && idx < recheck_count) return recheck_cond_nodes[idx];
-    return 0;
 }
 
 /* -------------------------------------------------------------------
@@ -684,14 +701,6 @@ void phase_graph_init(void) {
     reset_commitments();
 }
 
-void phase_graph_enter_branch(void) {
-    branch_depth++;
-}
-
-void phase_graph_exit_branch(void) {
-    if (branch_depth > 0) branch_depth--;
-}
-
 void phase_graph_build(int64_t body_node) {
     phase_graph_init();
     walk_node(body_node);
@@ -705,11 +714,11 @@ int phase_graph_query(const char *var, const char *phase) {
     }
     const VarState *v = &vars[vi];
 
-    /* unknown takes priority: if tracking is lost, return -1 (runtime fallback) */
+    /* If phase tracking was lost (e.g. a conditional/loop assignment), we cannot
+       statically decide membership — fall back to runtime. This must take priority
+       over the membership/reachability checks below, otherwise a phase recorded
+       before the branch could fold to a wrong literal. */
     if (v->unknown) {
-#ifdef PG_DEBUG
-        fprintf(stderr, "[PG] was %s.%s → -1 (unknown)\n", var, phase);
-#endif
         return -1;
     }
 
@@ -731,6 +740,14 @@ int phase_graph_query(const char *var, const char *phase) {
 #endif
             return 1;
         }
+    }
+
+    /* if unknown, fall back to runtime */
+    if (v->unknown) {
+#ifdef PG_DEBUG
+        fprintf(stderr, "[PG] was %s.%s → -1 (unknown)\n", var, phase);
+#endif
+        return -1;
     }
 
     /* if terminal and phase never seen nor reachable, definitely false */
@@ -755,6 +772,10 @@ int64_t phase_graph_record(const char *var, const char *phase) {
     int vi = add_var(var);
     if (vi < 0) return 0;
     VarState *v = &vars[vi];
+    /* Inside a conditional branch / loop body the assignment may or may not
+       execute, so we MUST NOT record it as a definite phase (that would let a
+       later `was x.P` fold to a wrong literal). Instead mark the variable
+       unknown so queries fall back to a runtime phase_graph_query(). */
     if (branch_depth > 0) {
         v->unknown = 1;
         return 1;

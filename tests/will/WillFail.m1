@@ -1,5 +1,14 @@
-module Main {
-    do main() -> Int {
-        will false
+-- Week 2 Feature 2: `will` return guard — the unmet case.
+-- Self-hosted dialect (module/fn/let live).
+--
+-- `will order == 1` is never satisfied (order stays 0), so the function-exit
+-- guard fires and prints "[M1101] will commitment unmet" to stderr. Prints 0.
+module WillFail {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live order : Int = 0;
+        let _w : Int = will order == 1;  -- never satisfied
+        m0_print_int(order)              -- prints 0; guard emits [M1101]
     }
 }

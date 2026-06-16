@@ -1,7 +1,18 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 2;
-        set live x : Int = x + 3;
-        now x == 5
+-- Week 2 Feature 1: `now` re-check after every mutation.
+-- Self-hosted dialect (module/fn/let live).
+--
+-- `now x >= 0` must hold at declaration AND after every later assignment to x.
+-- Here the second assignment sets x = -5, which violates the invariant, so the
+-- generated program prints "[M1100] now invariant violated" to stderr at the
+-- point of mutation. The program value is still x (== -5), proving the comma-
+-- chain re-check does not clobber the assignment's result.
+module NowRecheck {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 5;
+        let _a : Int = now x >= 0;
+        let _b : Int = x = 0 - 5;   -- violates now x >= 0  -> [M1100]
+        m0_print_int(x)             -- prints -5
     }
 }

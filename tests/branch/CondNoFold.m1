@@ -1,7 +1,13 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 0;
-        let _ : Int = when 1 == 0 then { x = 1 };
-        was x.1
+-- Week 3 Item 3: branch-aware phase tracking (soundness).
+-- `x` is assigned 1 ONLY inside a conditional `when` body whose condition is false,
+-- so at runtime x stays 0. The Phase Graph must NOT fold `was x.1` to a literal 1;
+-- it must fall back to a runtime query (which returns 0). Prints 0.
+-- (Before the fix this wrongly folded to 1.)
+module CondNoFold {
+    external "m0_print_int" : Int -> Int
+    fn main() -> Int {
+        let live x : Int = 0;
+        let _t : Int = when 1 == 0 then { x = 1 };
+        m0_print_int(was x.1)
     }
 }

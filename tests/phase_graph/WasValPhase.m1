@@ -1,10 +1,22 @@
--- Week 2 Feature 3: value-named phases.
--- `was x.5` folds to 1 because x is initialized to 5.
--- The phase graph records the integer value as a phase name.
--- Expected: exit code 1 (was x.5 == true)
-module Main {
-    do main() -> Int {
-        set live x : Int = 5;
-        was x.5
+-- Week 2 Feature 3: value-named phases (`was x.<int>`).
+-- Self-hosted dialect (module/fn/let live).
+--
+-- The Phase Graph records the actual assigned integer value as the phase name,
+-- so `was x.5` is true after `let live x = 5`, and `was x.10` is true after
+-- `x = 10` — and history is retained (x.5 stays true). A never-seen value
+-- (x.99) is false.
+--
+-- Expected printed digits: 1 1 1 1 0  => "11110"
+module WasValPhase {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 5;
+        let _a : Int = m0_print_int(was x.5);    -- 1 (initial value phase)
+        let _s : Int = x = 10;
+        let _b : Int = m0_print_int(was x.10);   -- 1 (after assignment)
+        let _c : Int = m0_print_int(was x.5);    -- 1 (history retained)
+        let _d : Int = m0_print_int(was x.10);   -- 1
+        m0_print_int(was x.99)                   -- 0 (never reached)
     }
 }

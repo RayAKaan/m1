@@ -1,7 +1,11 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 0;
-        set live _ : Int = x = 1;
-        was x.1
+-- Week 3 Item 3 control: an UNCONDITIONAL assignment still folds correctly.
+-- Confirms the branch-aware change didn't disable straight-line `was` folding.
+-- `was x.1` after `x = 1` folds to literal 1. Prints 1.
+module StraightFold {
+    external "m0_print_int" : Int -> Int
+    fn main() -> Int {
+        let live x : Int = 0;
+        let _s : Int = x = 1;
+        m0_print_int(was x.1)
     }
 }

@@ -1,9 +1,12 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 0;
-        set live x : Int = 5;
-        let _d0 : Int = will x == 5;
-        let _d1 : Int = now x >= 0;
-        x
+-- Week 3 Item 2: compatible constraints must NOT warn (no false positives).
+-- `will x == 5` + `now x >= 0` are jointly satisfiable (x=5 satisfies both).
+-- No [M1102] is emitted. Prints 0.
+module NoConflict {
+    external "m0_print_int" : Int -> Int
+    fn main() -> Int {
+        let live x : Int = 0;
+        let _w : Int = will x == 5;
+        let _n : Int = now x >= 0;    -- compatible -> no warning
+        m0_print_int(0)
     }
 }

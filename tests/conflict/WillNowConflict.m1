@@ -1,9 +1,14 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 0;
-        set live x : Int = 5;
-        let _d0 : Int = will x == 5;
-        let _d1 : Int = now x < 3;
-        x
+-- Week 3 Item 2: will + now conflict detection.
+-- `will x == 5` commits x to eventually equal 5; `now x < 3` requires x < 3 always.
+-- These are literally unsatisfiable together (5 is not < 3), so the compiler emits a
+-- compile-time [M1102] conflict warning. The program still compiles+runs (warning,
+-- not hard error). Prints 0.
+module WillNowConflict {
+    external "m0_print_int" : Int -> Int
+    fn main() -> Int {
+        let live x : Int = 0;
+        let _w : Int = will x == 5;
+        let _n : Int = now x < 3;     -- conflicts with the will -> [M1102]
+        m0_print_int(0)
     }
 }

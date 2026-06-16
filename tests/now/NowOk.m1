@@ -1,6 +1,16 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 5;
-        now x == 5
+-- Week 2 Feature 1: `now` re-check — the non-violating case.
+-- Self-hosted dialect (module/fn/let live).
+--
+-- The invariant `now x >= 0` stays true after the mutation (x = 10), so NO
+-- "[M1100]" diagnostic is emitted. Confirms the re-check does not produce
+-- false positives. Prints 10.
+module NowOk {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live x : Int = 5;
+        let _a : Int = now x >= 0;
+        let _b : Int = x = 10;      -- still satisfies now x >= 0
+        m0_print_int(x)             -- prints 10, no diagnostic
     }
 }

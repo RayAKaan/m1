@@ -1,6 +1,17 @@
-module Main {
-    do main() -> Int {
-        set live x : Int = 42;
-        will x == 42
+-- Week 2 Feature 2: `will` return guard — the satisfied case.
+-- Self-hosted dialect (module/fn/let live).
+--
+-- `will order == 1` is a commitment that must hold by function return. It is
+-- declared BEFORE the assignment that satisfies it, so the flag starts false at
+-- the will site and is re-accumulated to true by the later `order = 1` mutation.
+-- At return the guard passes: NO "[M1101]" diagnostic. Prints 1.
+module WillOk {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let live order : Int = 0;
+        let _w : Int = will order == 1;
+        let _s : Int = order = 1;       -- satisfies the commitment
+        m0_print_int(order)             -- prints 1, no diagnostic
     }
 }
