@@ -1,0 +1,8 @@
+world SayIntAutoTest {
+    external "m0_println" : String -> Int
+    external "m0_int_to_string" : Int -> String
+
+    do main() -> Int {
+        say(42)
+    }
+}

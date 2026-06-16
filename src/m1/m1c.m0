@@ -101,25 +101,20 @@ module M1C {
     let TK_EXISTS : Int = 48
     let TK_MUT : Int = 49
     let TK_WHILE : Int = 50
-    -- NOTE: these MUST match the M1Tk enum order in src/m1/lexer.c (the linked
-    -- lexer). They were previously misaligned (live/freeze/now/then) which made
-    -- temporal forms unparseable in the self-hosted path. Aligned 2026-06-14.
     let TK_FREEZE : Int = 51
     let TK_NOW : Int = 52
     let TK_WWAS : Int = 53
     let TK_WHEN : Int = 54
     let TK_WILL : Int = 55
-    let TK_LIVE : Int = 61
-    let TK_THEN : Int = 64
-    -- Surface-syntax keywords (Week 2 F4): world/do/set/pick/shape/say/show.
-    -- Values match the M1Tk enum order in lexer.m0 / lexer.c.
     let TK_WORLD : Int = 56
     let TK_DO : Int = 57
     let TK_SET : Int = 58
     let TK_PICK : Int = 59
     let TK_SHAPE : Int = 60
+    let TK_LIVE : Int = 61
     let TK_SAY : Int = 62
     let TK_SHOW : Int = 63
+    let TK_THEN : Int = 64
 
     let N_PROG : Int = 0
     let N_MOD : Int = 1
@@ -153,6 +148,8 @@ module M1C {
     let N_WHEN : Int = 29
     let N_FOR : Int = 30
     let N_CONST_DECL : Int = 31
+    let N_PICK : Int = 32
+    let N_SHAPE : Int = 33
 
     let T_NAMED : Int = 100
     let T_FN : Int = 101
@@ -324,6 +321,20 @@ module M1C {
         let s1 : Int = m0_set(n, 4, body);
         n
     }
+    fn n_pick(sc : Int, arms : Int, cnt : Int, line : Int, col : Int) -> Int {
+        let n : Int = nk(N_PICK, line, col, 6);
+        let s0 : Int = m0_set(n, 3, sc);
+        let s1 : Int = m0_set(n, 4, arms);
+        let s2 : Int = m0_set(n, 5, cnt);
+        n
+    }
+    fn n_shape(nm : String, ctors : Int, cnt : Int, line : Int, col : Int) -> Int {
+        let n : Int = nk(N_SHAPE, line, col, 6);
+        let s0 : Int = m0_store_string(n, 3, nm);
+        let s1 : Int = m0_set(n, 4, ctors);
+        let s2 : Int = m0_set(n, 5, cnt);
+        n
+    }
     fn t_name(nm : String, line : Int, col : Int) -> Int {
         let n : Int = nk(T_NAMED, line, col, 4);
         let s : Int = m0_store_string(n, 3, nm);
@@ -402,8 +413,6 @@ module M1C {
         let s1 : Int = m0_set(n, 4, ty);
         n
     }
-    -- Module-level constant: `let NAME : T = <expr>` (true self-hosting).
-    -- Holds the name and the value AST node; emitted as a C `#define`.
     fn n_const_decl(nm : String, v : Int, line : Int, col : Int) -> Int {
         let n : Int = nk(N_CONST_DECL, line, col, 5);
         let s0 : Int = m0_store_string(n, 3, nm);
@@ -475,8 +484,6 @@ module M1C {
         let k : Int = ps_kind(s);
         let line : Int = ps_line(s);
         let col : Int = ps_col(s);
-        -- The lexer emits TK_INT for the type name "Int" (deliberate hack),
-        -- so accept it here as a named type as well as TK_IDENT.
         if k == TK_INT { mk_pr(t_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_IDENT { mk_pr(t_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_LBRACE { gather_type_fields(ps_adv(s), m0_nil, line, col) } else {
@@ -515,9 +522,6 @@ module M1C {
     fn parse_type_expr(s : PS) -> PR { parse_type_arrow(s) }
 
     fn gather_params(s0 : PS, acc : Int) -> PR {
-        -- Skip a leading '(' if present. Callers pass the token that follows the
-        -- function name, which is '(' when there are params, or '()' (TK_UNIT)
-        -- for a zero-arg function. (Without this, '(' was misread as a param.)
         let s : PS = if ps_kind(s0) == TK_LPAREN { ps_adv(s0) } else { s0 };
         if ps_kind(s) == TK_RPAREN { mk_pr(rev(acc), ps_adv(s)) } else {
         if ps_kind(s) == TK_UNIT { mk_pr(rev(acc), ps_adv(s)) } else {
@@ -551,10 +555,6 @@ module M1C {
     fn gather_args(s : PS, acc : Int) -> PR {
         if ps_kind(s) == TK_RPAREN { mk_pr(rev(acc), ps_adv(s)) } else {
         if ps_kind(s) == TK_UNIT {
-            -- Bootstrap-dialect zero-arg call `f(())`: the inner `()` lexes as a
-            -- single TK_UNIT. Consume it AND the closing `)` so no stray RPAREN is
-            -- left to derail the rest of the parse. (m1c's own `f()` form is handled
-            -- separately in parse_postfix_loop.) Treated as zero args.
             let s1 : PS = ps_adv(s);
             let s2 : PS = if ps_kind(s1) == TK_RPAREN { ps_adv(s1) } else { s1 };
             mk_pr(rev(acc), s2)
@@ -682,7 +682,7 @@ module M1C {
             let pr : PR = parse_pat_atom(s);
             let s2 : PS = ps_adv(pr.st);
             let br : PR = parse_expr(s2);
-            let s3 : PS = ps_adv(br.st);
+            let s3 : PS = if ps_kind(br.st) == TK_SEMI { ps_adv(br.st) } else { br.st };
             gather_arms(s3, m0_cons(mk_arm(pr.node, br.node), acc))
         }
     }
@@ -718,7 +718,6 @@ module M1C {
         if k == TK_IDENT { mk_pr(n_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_LET {
             let s_after_let : PS = ps_adv(s);
-            -- `let live x : T = v` declares a live (Phase-Graph-tracked) binding.
             let is_live : Int = if ps_kind(s_after_let) == TK_LIVE { 1 } else { 0 };
             let is_mut : Int = if m0_string_eq(ps_str(s_after_let), "mut") == 1 { 1 } else { 0 };
             let nm_ps : PS = if is_live == 1 { ps_adv(s_after_let) } else {
@@ -738,7 +737,6 @@ module M1C {
             }
         } else {
         if k == TK_SET {
-            -- `set [live] name : T = v` == `let [live] ...` (Week 2 F4).
             let s_after_set : PS = ps_adv(s);
             let is_live : Int = if ps_kind(s_after_set) == TK_LIVE { 1 } else { 0 };
             let nm_ps : PS = if is_live == 1 { ps_adv(s_after_set) } else { s_after_set };
@@ -757,13 +755,16 @@ module M1C {
             }
         } else {
         if k == TK_SAY {
-            -- `say(e)` lowers to a call to m0_println (Week 2 F4).
             let r : PR = parse_expr(ps_adv(ps_adv(s)));
             let s2 : PS = ps_adv(r.st);
-            mk_pr(n_call(n_name("m0_println", line, col), m0_cons(r.node, m0_nil), 1, line, col), s2)
+            let arg_node : Int = if m0_get(r.node, 0) == N_INT {
+                n_call(n_name("m0_int_to_string", line, col), m0_cons(r.node, m0_nil), 1, line, col)
+            } else {
+                r.node
+            };
+            mk_pr(n_call(n_name("m0_println", line, col), m0_cons(arg_node, m0_nil), 1, line, col), s2)
         } else {
         if k == TK_SHOW {
-            -- `show(e)` lowers to a call to m0_print (Week 2 F4).
             let r : PR = parse_expr(ps_adv(ps_adv(s)));
             let s2 : PS = ps_adv(r.st);
             mk_pr(n_call(n_name("m0_print", line, col), m0_cons(r.node, m0_nil), 1, line, col), s2)
@@ -773,11 +774,12 @@ module M1C {
             let ar : PR = gather_arms(ps_adv(sr.st), m0_nil);
             mk_pr(n_match(sr.node, ar.node, list_len(ar.node), line, col), ar.st)
         } else {
+        if k == TK_PICK {
+            let sr : PR = parse_expr(ps_adv(s));
+            let ar : PR = gather_arms(ps_adv(sr.st), m0_nil);
+            mk_pr(n_pick(sr.node, ar.node, list_len(ar.node), line, col), ar.st)
+        } else {
         if k == TK_IF {
-            -- if-cond-then-else. The then/else bodies are normal expressions; brace
-            -- blocks are handled by parse_atom's LBRACE case, so parse them directly
-            -- (no token-skip, which previously ate the body open-brace and swallowed
-            -- the continuation).
             let cr : PR = parse_expr(ps_adv(s));
             let tr : PR = parse_expr(cr.st);
             let s3 : PS = tr.st;
@@ -787,25 +789,17 @@ module M1C {
             mk_pr(n_if(cr.node, tr.node, er.node, line, col), er.st)
         } else {
         if k == TK_WHILE {
-            -- while-cond-body. The body is a normal expression (a brace block is
-            -- handled by parse_atom's LBRACE case), so do NOT skip a token before
-            -- parsing it — that previously skipped the body open-brace and swallowed
-            -- the continuation.
             let cr : PR = parse_expr(ps_adv(s));
             let br : PR = parse_expr(cr.st);
             mk_pr(n_while(cr.node, br.node, line, col), br.st)
         } else {
         if k == TK_FREEZE {
             let nm : String = ps_str(ps_adv(s));
-            -- advance past both 'freeze' and the variable name
             mk_pr(n_freeze(nm, line, col), ps_adv(ps_adv(s)))
         } else {
         if k == TK_WWAS {
             let vr : PR = parse_atom(ps_adv(s));
-            -- vr.st points at '.', skip it to reach the phase name
             let s_phase : PS = ps_adv(vr.st);
-            -- A value-named phase `was x.1` lexes the phase as TK_INT (str_val
-            -- empty), so build the name from the integer value (Week 2 F3).
             let ph : String = if ps_kind(s_phase) == TK_INT {
                 m0_int_to_string(ps_int(s_phase))
             } else {
@@ -840,26 +834,17 @@ module M1C {
             mk_pr(n_live(nm, tr.node, vr.node, br.node, line, col), br.st)
         } else {
         if k == TK_LBRACE {
-            -- Disambiguate three brace forms (comments avoid brace chars):
-            --   field-list with commas   -> record literal
-            --   single name = expr       -> assignment used as a one-statement block
-            --   any other expr           -> block whose value is the inner expression
-            -- Parse the first inner expression; if a comma follows, it is a record
-            -- (gather remaining fields), otherwise it is a block.
             let s_in : PS = ps_adv(s);
             let looks_field : Int = if ps_kind(s_in) == TK_IDENT {
                 if ps_kind(ps_adv(s_in)) == TK_EQ { 1 } else { 0 }
             } else { 0 };
             if looks_field == 1 {
-                -- after the first name = value: a comma means record, else block
                 let nm : String = ps_str(s_in);
                 let s_val : PS = ps_adv(ps_adv(s_in));
                 let vr : PR = parse_impl(s_val);
                 if ps_kind(vr.st) == TK_COMMA {
-                    -- record: this is field 1; gather the rest after the comma
                     gather_field_inits(ps_adv(vr.st), m0_cons(mk_fi(nm, vr.node), m0_nil), line, col)
                 } else {
-                    -- single `name = expr` block: emit as an assignment expression
                     let blk : Int = n_assign(nm, vr.node, line, col);
                     mk_pr(blk, ps_adv(vr.st))
                 }
@@ -874,7 +859,31 @@ module M1C {
             mk_pr(r.node, ps_adv(r.st))
         } else {
             mk_pr(n_unit(line, col), ps_err(s))
-        }}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}
+    }
+
+    fn is_expr_start(k : Int) -> Int {
+        if k == TK_INT { 1 } else {
+        if k == TK_STRING { 1 } else {
+        if k == TK_IDENT { 1 } else {
+        if k == TK_LPAREN { 1 } else {
+        if k == TK_LBRACE { 1 } else {
+        if k == TK_IF { 1 } else {
+        if k == TK_WHILE { 1 } else {
+        if k == TK_MATCH { 1 } else {
+        if k == TK_PICK { 1 } else {
+        if k == TK_SAY { 1 } else {
+        if k == TK_SHOW { 1 } else {
+        if k == TK_FREEZE { 1 } else {
+        if k == TK_WWAS { 1 } else {
+        if k == TK_WILL { 1 } else {
+        if k == TK_NOW { 1 } else {
+        if k == TK_WHEN { 1 } else {
+        if k == TK_NOT { 1 } else {
+        if k == TK_MINUS { 1 } else {
+        if k == TK_TRUE { 1 } else {
+        if k == TK_FALSE { 1 } else {
+        if k == TK_UNIT { 1 } else { 0 }}}}}}}}}}}}}}}}}}}}}
     }
 
     fn parse_decl(s : PS) -> PR {
@@ -883,10 +892,15 @@ module M1C {
         let col : Int = ps_col(s);
         if k == TK_TYPE {
             let nm : String = ps_str(ps_adv(s));
-            -- skip three tokens: the type keyword, the name, and the '='
             let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_type_decl(nm, tr.node, line, col), tr.st)
+        } else {
+        if k == TK_SHAPE {
+            let nm : String = ps_str(ps_adv(s));
+            let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
+            let tr : PR = parse_type_expr(s2);
+            mk_pr(n_shape(nm, m0_get(tr.node, 3), m0_get(tr.node, 4), line, col), tr.st)
         } else {
         if k == TK_FN {
             let nm : String = ps_str(ps_adv(s));
@@ -899,7 +913,6 @@ module M1C {
             mk_pr(n_fn_decl(nm, pr.node, list_len(pr.node), rr.node, br.node, line, col), s4)
         } else {
         if k == TK_DO {
-            -- `do name(params) -> Ret { body }` == `fn ...` (Week 2 F4).
             let nm : String = ps_str(ps_adv(s));
             let pr : PR = gather_params(ps_adv(ps_adv(s)), m0_nil);
             let s2 : PS = ps_adv(pr.st);
@@ -911,27 +924,26 @@ module M1C {
         } else {
         if k == TK_EXTERNAL {
             let cn : String = ps_str(ps_adv(s));
-            -- skip 'external', the name string, and the ':'
             let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_extern(cn, tr.node, line, col), tr.st)
         } else {
         if k == TK_LET {
-            -- Module-level constant `let NAME : T = <value>` (no body; true
-            -- self-hosting). Parse: 'let', name, ':', type, '=', value-expr.
             let nm : String = ps_str(ps_adv(s));
             let s_after_name : PS = ps_adv(ps_adv(s));
-            -- s_after_name is at ':'; skip ':' then the type, then '='.
             let s_after_colon : PS = ps_adv(s_after_name);
             let tr : PR = parse_type_expr(s_after_colon);
             let s_after_type : PS = ps_adv(tr.st);
             let vr : PR = parse_expr(s_after_type);
             mk_pr(n_const_decl(nm, vr.node, line, col), vr.st)
         } else {
-            -- Unrecognized declaration token: record the error AND advance, so
-            -- gather_decls cannot loop forever on the same token (stack overflow).
+        if is_expr_start(k) == 1 {
+            let er : PR = parse_expr(s);
+            let s2 : PS = if ps_kind(er.st) == TK_SEMI { ps_adv(er.st) } else { er.st };
+            mk_pr(n_let("_", t_name("Int", line, col), er.node, n_unit(line, col), line, col), s2)
+        } else {
             mk_pr(n_unit(line, col), ps_err(ps_adv(s)))
-        }}}}}
+        }}}}}}}
     }
 
     fn gather_decls(s : PS, acc : Int) -> PR {
@@ -946,7 +958,6 @@ module M1C {
         let line : Int = ps_line(s);
         let col : Int = ps_col(s);
         let nm : String = ps_str(ps_adv(s));
-        -- skip three tokens: the module keyword, the name, and the opening brace
         let s2 : PS = ps_adv(ps_adv(ps_adv(s)));
         let dr : PR = gather_decls(s2, m0_nil);
         mk_pr(n_mod(nm, dr.node, list_len(dr.node), line, col), dr.st)
@@ -955,8 +966,6 @@ module M1C {
     fn gather_modules(s : PS, acc : Int) -> PR {
         let k : Int = ps_kind(s);
         if k == TK_EOF { mk_pr(rev(acc), s) } else {
-            -- `world Name { ... }` parses identically to `module Name { ... }`
-            -- (Week 2 F4): same shape, different keyword.
             if k == TK_MODULE {
                 let r : PR = parse_module(s);
                 gather_modules(r.st, m0_cons(r.node, acc))
@@ -996,7 +1005,6 @@ module M1C {
         }
     }
 
-    -- Does a type's field list contain a field named `fname`? (true self-hosting)
     fn fields_have(fields : Int, fname : String) -> Int {
         if m0_is_nil(fields) == 1 { 0 } else {
             if m0_string_eq(m0_load_string(m0_head(fields), 0), fname) == 1 { 1 }
@@ -1004,15 +1012,53 @@ module M1C {
         }
     }
 
-    -- Find the record type whose fields include `fname`; returns its C type name,
-    -- or "" if none match. Used to emit a compound-literal cast `(Type){...}` so a
-    -- record literal is valid both as a `let` initializer and as a value position.
     fn lookup_type_by_field(reg : Int, fname : String) -> String {
         if m0_is_nil(reg) == 1 { "" } else {
             if fields_have(reg_fields(m0_head(reg)), fname) == 1 {
                 reg_name(m0_head(reg))
             } else { lookup_type_by_field(m0_tail(reg), fname) }
         }
+    }
+
+    fn find_ctor_index(ctors : Int, name : String, i : Int) -> Int {
+        if m0_is_nil(ctors) == 1 { -1 } else {
+            if m0_string_eq(m0_load_string(m0_head(ctors), 0), name) == 1 { i }
+            else { find_ctor_index(m0_tail(ctors), name, i + 1) }
+        }
+    }
+
+    fn lookup_ctor_info(reg : Int, ctor_name : String) -> Int {
+        if m0_is_nil(reg) == 1 { 0 } else {
+            let entry : Int = m0_head(reg);
+            let t : Int = reg_type(entry);
+            if m0_get(t, 0) == T_SUM {
+                let ctors : Int = m0_get(t, 3);
+                let idx : Int = find_ctor_index(ctors, ctor_name, 0);
+                if idx >= 0 {
+                    let info : Int = m0_alloc(3);
+                    let _s0 : Int = m0_store_string(info, 0, reg_name(entry));
+                    let _s1 : Int = m0_store_string(info, 1, ctor_name);
+                    let _s2 : Int = m0_set(info, 2, idx);
+                    info
+                } else { lookup_ctor_info(m0_tail(reg), ctor_name) }
+            } else { lookup_ctor_info(m0_tail(reg), ctor_name) }
+        }
+    }
+
+    fn emit_enum_tags_body(reg : Int, l : Int, sname : String, i : Int) -> Int {
+        if m0_is_nil(l) == 1 { m0_print(" };\n") } else {
+            let _sep : Int = if i == 0 { m0_print("enum { ") } else { m0_print(", ") };
+            let _p0 : Int = m0_print(sname);
+            let _p1 : Int = m0_print("_");
+            let _p2 : Int = m0_print(m0_load_string(m0_head(l), 0));
+            let _p3 : Int = m0_print(" = ");
+            let _p4 : Int = m0_print_int(i);
+            emit_enum_tags_body(reg, m0_tail(l), sname, i + 1)
+        }
+    }
+
+    fn emit_enum_tags(reg : Int, l : Int, sname : String) -> Int {
+        emit_enum_tags_body(reg, l, sname, 0)
     }
 
     fn build_reg(decls : Int, reg : Int) -> Int {
@@ -1025,7 +1071,13 @@ module M1C {
                     m0_get(t, 3)
                 } else { m0_nil };
                 build_reg(m0_tail(decls), m0_cons(reg_entry(nm, t, fields), reg))
-            } else { build_reg(m0_tail(decls), reg) }
+            } else {
+            if m0_get(d, 0) == N_SHAPE {
+                let nm : String = m0_load_string(d, 3);
+                let t : Int = t_sum(m0_get(d, 4), m0_get(d, 5), 0, 0);
+                let fields : Int = m0_nil;
+                build_reg(m0_tail(decls), m0_cons(reg_entry(nm, t, fields), reg))
+            } else { build_reg(m0_tail(decls), reg) }}
         }
     }
 
@@ -1117,37 +1169,84 @@ module M1C {
         }
     }
 
+    fn emit_arm_guard(reg : Int, pat : Int, body : Int) -> Int {
+        let pk : Int = m0_get(pat, 0);
+        if pk == P_LIT {
+            let _p0 : Int = m0_print("else if (");
+            let _p1 : Int = emit_c_expr(reg, m0_get(pat, 3));
+            let _p2 : Int = m0_print(" == _m) { _result = (");
+            let _p3 : Int = emit_c_expr(reg, body);
+            m0_print("); }")
+        } else {
+        if pk == P_WILD {
+            let _p0 : Int = m0_print("else { _result = (");
+            let _p1 : Int = emit_c_expr(reg, body);
+            m0_print("); }")
+        } else {
+        if pk == P_NAME {
+            let nm : String = m0_load_string(pat, 3);
+            let ctor : Int = lookup_ctor_info(reg, nm);
+            if ctor == 0 {
+                let _p0 : Int = m0_print("else { int64_t ");
+                let _p1 : Int = m0_print(nm);
+                let _p2 : Int = m0_print(" = _m; _result = (");
+                let _p3 : Int = emit_c_expr(reg, body);
+                m0_print("); }")
+            } else {
+                let sname : String = m0_load_string(ctor, 0);
+                let _p0 : Int = m0_print("else if (_m.tag == ");
+                let _p1 : Int = m0_print(sname);
+                let _p2 : Int = m0_print("_");
+                let _p3 : Int = m0_print(nm);
+                let _p4 : Int = m0_print(") { _result = (");
+                let _p5 : Int = emit_c_expr(reg, body);
+                m0_print("); }")
+            }
+        } else {
+        if pk == P_CTOR {
+            let cname : String = m0_load_string(pat, 3);
+            let ctor : Int = lookup_ctor_info(reg, cname);
+            if ctor == 0 {
+                let _p0 : Int = m0_print("else { _result = (");
+                let _p1 : Int = emit_c_expr(reg, body);
+                m0_print("); }")
+            } else {
+                let sname : String = m0_load_string(ctor, 0);
+                let sub : Int = m0_get(pat, 4);
+                let _p0 : Int = m0_print("else if (_m.tag == ");
+                let _p1 : Int = m0_print(sname);
+                let _p2 : Int = m0_print("_");
+                let _p3 : Int = m0_print(cname);
+                if m0_get(sub, 0) == P_NAME {
+                    let _a0 : Int = m0_print(") { int64_t ");
+                    let _a1 : Int = m0_print(m0_load_string(sub, 3));
+                    let _a2 : Int = m0_print(" = _m.data.");
+                    let _a3 : Int = m0_print(cname);
+                    let _a4 : Int = m0_print("_v; _result = (");
+                    let _a5 : Int = emit_c_expr(reg, body);
+                    m0_print("); }")
+                } else {
+                    let _e0 : Int = m0_print(") { _result = (");
+                    let _e1 : Int = emit_c_expr(reg, body);
+                    m0_print("); }")
+                }
+            }
+        } else {
+            let _p0 : Int = m0_print("else { _result = (");
+            let _p1 : Int = emit_c_expr(reg, body);
+            m0_print("); }")
+        }
+        }
+        }
+        }
+    }
+
     fn emit_c_expr_arms_ea(reg : Int, l : Int, first : Int) -> Int {
         if m0_is_nil(l) == 1 { 0 } else {
             let pat : Int = m0_get(m0_head(l), 0);
             let body : Int = m0_get(m0_head(l), 1);
-            let pk : Int = m0_get(pat, 0);
-            let _psep : Int = if first == 0 { m0_print(" else ") } else { 0 };
-            let _re : Int = if pk == P_WILD {
-                let _p0 : Int = m0_print("(");
-                let _p1 : Int = emit_c_expr(reg, body);
-                m0_print(")")
-            } else {
-                if pk == P_LIT {
-                    let _p0 : Int = m0_print("(");
-                    let _p1 : Int = emit_c_expr(reg, m0_get(pat, 3));
-                    let _p2 : Int = m0_print(" == _m ? (");
-                    let _p3 : Int = emit_c_expr(reg, body);
-                    m0_print(") : ")
-                } else {
-                    if pk == P_NAME {
-                        let _p0 : Int = m0_print("{ int64_t ");
-                        let _p1 : Int = m0_print(m0_load_string(pat, 3));
-                        let _p2 : Int = m0_print(" = _m; (");
-                        let _p3 : Int = emit_c_expr(reg, body);
-                        m0_print("); }")
-                    } else {
-                        let _p0 : Int = m0_print("(");
-                        let _p1 : Int = emit_c_expr(reg, body);
-                        m0_print(")")
-                    }
-                }
-            };
+            let _if0 : Int = if first == 1 { m0_print("if (0) {} ") } else { 0 };
+            let _ag : Int = emit_arm_guard(reg, pat, body);
             emit_c_expr_arms_ea(reg, m0_tail(l), 0)
         }
     }
@@ -1173,13 +1272,6 @@ module M1C {
         }
     }
 
-    -- Extract a simple variable name from an expression node.
-    -- Handles N_NAME (the var itself) and N_FIELD (the base of x.Phase).
-    -- Returns "" when the target is not a simple name (caller must fall back).
-    -- Emit a runtime re-check for each active `now` condition (Week 2 F1).
-    -- Walks the registered condition nodes [i, n) and, for each, emits
-    --   , ({ if (!(<cond>)) { fprintf(stderr,"[M1100]..."); } 0; })
-    -- as additional comma-operator terms after an assignment.
     fn now_emit_rechecks(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
             let _c0 : Int = m0_print(", ({ if (!(");
@@ -1189,14 +1281,6 @@ module M1C {
         }
     }
 
-    -- will return-guard support (Week 2 F2). Because M1 locals live in nested
-    -- statement-expressions, the return-time guard cannot reference them. We use
-    -- function-scope flags `_will_flags[k]` that accumulate "was the commitment
-    -- ever satisfied" in-scope (at the will site and after each assignment), and
-    -- check the flags (always in scope) at return.
-    --
-    -- For each registered will [i, n): emit a comma term that OR-accumulates the
-    -- flag with the (re-evaluated, in-scope) condition.
     fn will_emit_updates(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
             let _u0 : Int = m0_print(", (_will_flags[");
@@ -1210,7 +1294,6 @@ module M1C {
         }
     }
 
-    -- At return, emit one guard per registered will reading its function-scope flag.
     fn will_emit_guards(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
             let _g0 : Int = m0_print("  if (!_will_flags[");
@@ -1220,11 +1303,6 @@ module M1C {
         }
     }
 
-    -- will+now conflict detection (Week 3 Item 2). If the condition is a simple
-    -- comparison of a variable against an integer literal (`x op LIT` or
-    -- `LIT op x`), record it as a constraint and let the Phase Graph flag a literal
-    -- contradiction with a prior constraint on the same variable. kind: 0=now, 1=will.
-    -- Returns 0 (effectful only); conditions that aren't var-vs-literal are ignored.
     fn register_constraint(cond : Int, kind : Int) -> Int {
         if m0_get(cond, 0) == N_BINARY {
             let op : Int = m0_get(cond, 3);
@@ -1244,7 +1322,6 @@ module M1C {
         } else { 0 }
     }
 
-    -- Flip a comparison operator when operands are swapped (LIT op x -> x op' LIT).
     fn flip_op(op : Int) -> Int {
         if op == OP_LT { OP_GT } else {
         if op == OP_GT { OP_LT } else {
@@ -1272,7 +1349,20 @@ module M1C {
             if m0_get(e, 3) == 1 { m0_print("1") } else { m0_print("0") }
         } else {
         if k == N_UNIT { m0_print("0") } else {
-        if k == N_NAME { m0_print(m0_load_string(e, 3)) } else {
+        if k == N_NAME {
+            let nm : String = m0_load_string(e, 3);
+            let ctor : Int = lookup_ctor_info(reg, nm);
+            if ctor == 0 { m0_print(nm) } else {
+                let sname : String = m0_load_string(ctor, 0);
+                let _p0 : Int = m0_print("(");
+                let _p1 : Int = m0_print(sname);
+                let _p2 : Int = m0_print("){ .tag = ");
+                let _p3 : Int = m0_print(sname);
+                let _p4 : Int = m0_print("_");
+                let _p5 : Int = m0_print(nm);
+                m0_print(" }")
+            }
+        } else {
         if k == N_BINARY {
             let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 4));
@@ -1293,11 +1383,37 @@ module M1C {
             m0_print(m0_load_string(e, 4))
         } else {
         if k == N_CALL {
-            let _p0 : Int = emit_c_expr(reg, m0_get(e, 3));
-            let _p1 : Int = m0_print("(");
-            let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
-            m0_print(")")
+            let func : Int = m0_get(e, 3);
+            if m0_get(func, 0) == N_NAME {
+                let fnm : String = m0_load_string(func, 3);
+                let ctor : Int = lookup_ctor_info(reg, fnm);
+                if ctor == 0 {
+                    let _p0 : Int = m0_print(fnm);
+                    let _p1 : Int = m0_print("(");
+                    let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
+                    m0_print(")")
+                } else {
+                    let sname : String = m0_load_string(ctor, 0);
+                    let _p0 : Int = m0_print("(");
+                    let _p1 : Int = m0_print(sname);
+                    let _p2 : Int = m0_print("){ .tag = ");
+                    let _p3 : Int = m0_print(sname);
+                    let _p4 : Int = m0_print("_");
+                    let _p5 : Int = m0_print(fnm);
+                    let _p6 : Int = m0_print(", .data.");
+                    let _p7 : Int = m0_print(fnm);
+                    let _p8 : Int = m0_print("_v = ");
+                    let _p9 : Int = emit_c_expr(reg, m0_head(m0_get(e, 4)));
+                    m0_print(" }")
+                }
+            } else {
+                let _p0 : Int = emit_c_expr(reg, func);
+                let _p1 : Int = m0_print("(");
+                let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
+                m0_print(")")
+            }
         } else {
+
         if k == N_LET {
             let _p0 : Int = m0_print("({ ");
             let _p1 : Int = emit_c_type(reg, m0_get(e, 4));
@@ -1310,9 +1426,6 @@ module M1C {
             m0_print("; })")
         } else {
         if k == N_IF {
-            -- The condition is unconditional, but each arm may or may not run, so
-            -- bracket the arms with enter/exit_branch: phases recorded inside are
-            -- treated as uncertain (no wrong `was` folding) (Week 3 Item 3).
             let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(" ? (");
@@ -1327,22 +1440,24 @@ module M1C {
             m0_print("))")
         } else {
         if k == N_MATCH {
-            -- Match arms are conditional; bracket them so phases recorded inside an
-            -- arm are uncertain (Week 3 Item 3). The scrutinee runs unconditionally.
-            let _p0 : Int = m0_print("({ int64_t _m = ");
+            let _p0 : Int = m0_print("({ __auto_type _m = ");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
-            let _p2 : Int = m0_print("; ");
+            let _p2 : Int = m0_print("; int64_t _result = 0; ");
             let _b0 : Int = pg_enter_branch();
             let _p3 : Int = emit_c_expr_arms_ea(reg, m0_get(e, 4), 1);
             let _b1 : Int = pg_exit_branch();
-            m0_print("; })")
+            m0_print("_result; })")
+        } else {
+        if k == N_PICK {
+            let _p0 : Int = m0_print("({ __auto_type _m = ");
+            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            let _p2 : Int = m0_print("; int64_t _result = 0; ");
+            let _b0 : Int = pg_enter_branch();
+            let _p3 : Int = emit_c_expr_arms_ea(reg, m0_get(e, 4), 1);
+            let _b1 : Int = pg_exit_branch();
+            m0_print("_result; })")
         } else {
         if k == N_RECORD {
-            -- Record literal `{ x = 3, y = 7 }`. Emit a compound-literal cast
-            -- `(Type){ .x = 3, .y = 7 }` so it is valid both as a `let` initializer
-            -- AND as the value of a statement-expression (e.g. ps_adv's body). The
-            -- type is recovered by matching the first field name against the type
-            -- registry; if unknown, fall back to a bare initializer (true self-host).
             let fields : Int = m0_get(e, 3);
             let tnm : String = if m0_is_nil(fields) == 0 {
                 lookup_type_by_field(reg, m0_load_string(m0_head(fields), 0))
@@ -1357,8 +1472,6 @@ module M1C {
             m0_print(" }")
         } else {
         if k == N_WHILE {
-            -- Loop body runs 0..n times; bracket it so phase recordings inside are
-            -- uncertain (Week 3 Item 3).
             let _p0 : Int = m0_print("({ while (");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(") { ");
@@ -1370,18 +1483,11 @@ module M1C {
         if k == N_ASSIGN {
             let nm : String = m0_load_string(e, 3);
             let rhs : Int = m0_get(e, 4);
-            -- Record a phase transition for this var in the Phase Graph so that
-            -- a later `was x.<phase>` can be answered. If the RHS is an integer
-            -- literal, record the value as the phase name (so `was x.1` folds
-            -- after `x = 1`); otherwise record a generic "set" phase (Week 2 F3).
             let _pg : Int = if m0_get(rhs, 0) == N_INT {
                 pg_record(nm, m0_int_to_string(m0_get(rhs, 3)))
             } else {
                 pg_record(nm, "set")
             };
-            -- Emit: (name = rhs, <recheck each active now>..., name)
-            -- The trailing `name` makes the comma-expression value the assigned
-            -- variable, not the discarded re-check result (Week 2 F1).
             let _p0 : Int = m0_print("(");
             let _p1 : Int = m0_print(nm);
             let _p2 : Int = m0_print(" = ");
@@ -1394,14 +1500,8 @@ module M1C {
         } else {
         if k == N_LIVE {
             let nm : String = m0_load_string(e, 3);
-            -- Record the lowercase "live" phase (special: "ever assigned")
-            -- and a capitalized "Live" phase (the initial declared phase).
-            -- "Live" is a normal identifier and so is queryable via
-            -- `was x.Live`; the keyword `live` cannot be used after `.`.
             let _r0 : Int = pg_record(nm, "live");
             let _r1 : Int = pg_record(nm, "Live");
-            -- If the initial value is an integer literal, record it as a phase
-            -- too, so `was x.0` folds after `let live x : Int = 0` (Week 2 F3).
             let _r2 : Int = if m0_get(m0_get(e, 5), 0) == N_INT {
                 pg_record(nm, m0_int_to_string(m0_get(m0_get(e, 5), 3)))
             } else { 0 };
@@ -1425,10 +1525,6 @@ module M1C {
             let ph : String = m0_load_string(e, 4);
             let vn : String = extract_var_name(var_e);
             let res : Int = pg_query(vn, ph);
-            -- pg_query returns 1 (statically true), 0 (statically false),
-            -- or -1 (undecidable at compile time). Fold 0/1 to a C literal;
-            -- on -1 fall back to a runtime phase_graph_query() call so the
-            -- answer is still correct, just not folded.
             if res == 1 { m0_print("1") } else {
             if res == 0 { m0_print("0") } else {
                 let _q0 : Int = m0_print("phase_graph_query(\"");
@@ -1439,10 +1535,6 @@ module M1C {
             }}
         } else {
         if k == N_WILL {
-            -- will C : register the commitment for a return-time guard (Week 2 F2).
-            -- Emit `(_will_flags[k] = (C))` so the flag captures whether the
-            -- commitment holds at the will site (and it is re-accumulated after
-            -- every later assignment via will_emit_updates).
             let _cf : Int = register_constraint(m0_get(e, 3), 1);
             let _idx : Int = pg_wg_count();
             let _reg : Int = pg_wg_declare(m0_get(e, 3));
@@ -1453,8 +1545,6 @@ module M1C {
             m0_print("))")
         } else {
         if k == N_NOW {
-            -- now C : emit the initial runtime invariant check, AND register the
-            -- condition node so every later assignment re-checks it (Week 2 F1).
             let _cf : Int = register_constraint(m0_get(e, 3), 0);
             let _reg : Int = pg_rc_declare(m0_get(e, 3));
             let _p0 : Int = m0_print("({ if (!(");
@@ -1463,8 +1553,6 @@ module M1C {
             0
         } else {
         if k == N_WHEN {
-            -- when cond then body: the body is conditional, so bracket it so phases
-            -- recorded inside are uncertain (Week 3 Item 3 soundness).
             let _p0 : Int = m0_print("(");
             let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
             let _p2 : Int = m0_print(" ? ");
@@ -1473,8 +1561,15 @@ module M1C {
             let _b1 : Int = pg_exit_branch();
             m0_print(" : 0)")
         } else {
+        if k == N_SEQ {
+            let _p0 : Int = m0_print("(");
+            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            let _p2 : Int = m0_print(", ");
+            let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
+            m0_print(")")
+        } else {
             m0_print("0")
-        }}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn emit_c_params(reg : Int, params : Int) -> Int {
@@ -1528,12 +1623,7 @@ module M1C {
         let _p2 : Int = m0_print(nm);
         let _p3 : Int = m0_print("(");
         let _p4 : Int = if is_main == 1 { m0_print("void") } else { emit_fn_ep(reg, params, 1) };
-        -- Reset the compile-time Phase Graph before walking this function body.
-        -- Phase state (live/freeze/was) is tracked per-function during emit.
         let _pg : Int = pg_init();
-        -- Function-scope flags for `will` return guards (Week 2 F2). Declared
-        -- before the body so they're in scope both where they're set (will site /
-        -- after assignments) and where they're checked (return guard). 64 = max.
         let _p5 : Int = m0_print(") {\n  int _will_flags[64] = {0}; (void)_will_flags;\n  ");
         let _rt : Int = if is_main == 1 { m0_print("int") } else { emit_c_type(reg, ret) };
         let _p6 : Int = m0_print(" _ret = ");
@@ -1543,9 +1633,6 @@ module M1C {
         m0_print("  return _ret;\n}\n")
     }
 
-    -- Emit a forward prototype for a function so callers defined earlier in the
-    -- file link against the correct signature (avoids implicit int() declarations
-    -- and the resulting "conflicting types" errors) (true self-hosting).
     fn emit_fn_proto(reg : Int, d : Int) -> Int {
         let nm : String = m0_load_string(d, 3);
         let params : Int = m0_get(d, 4);
@@ -1569,10 +1656,6 @@ module M1C {
         }
     }
 
-    -- Emit module-level constants as C `#define`s (true self-hosting). Placed
-    -- after the hardcoded preamble globals so that, for the 16 phase-graph N_*
-    -- names, the macro just shadows local reads with the identical value while the
-    -- real globals stay exported for phase_graph.c to link against.
     fn emit_const(reg : Int, d : Int) -> Int {
         let nm : String = m0_load_string(d, 3);
         let _p0 : Int = m0_print("#define ");
@@ -1593,7 +1676,13 @@ module M1C {
     fn emit_module_pass1(reg : Int, l : Int) -> Int {
         if m0_is_nil(l) == 1 { 0 } else {
             let d : Int = m0_head(l);
-            let _e : Int = if m0_get(d, 0) == N_TYPE_DECL { emit_typedef(reg, m0_get(d, 4), m0_load_string(d, 3)) } else { 0 };
+            let _e : Int = if m0_get(d, 0) == N_TYPE_DECL { emit_typedef(reg, m0_get(d, 4), m0_load_string(d, 3)) } else {
+            if m0_get(d, 0) == N_SHAPE {
+                let nm : String = m0_load_string(d, 3);
+                let _t : Int = emit_typedef(reg, t_sum(m0_get(d, 4), m0_get(d, 5), 0, 0), nm);
+                emit_enum_tags(reg, m0_get(d, 4), nm)
+            } else { 0 }
+            };
             emit_module_pass1(reg, m0_tail(l))
         }
     }
@@ -1618,15 +1707,8 @@ module M1C {
         let decls : Int = m0_get(m, 4);
         let reg : Int = build_reg(decls, m0_nil);
         let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
-        -- Prototype for the Phase Graph runtime query, used by `was` when the
-        -- result is undecidable at compile time (pg_query returned -1).
-        -- Note: signature must match what m1c's own external declaration emits
-        -- (int64_t, char* not const char*) so self-hosting doesn't conflict.
         let _hq : Int = m0_print("extern int64_t phase_graph_query(char*, char*);\n");
-        -- Emit the AST node-kind tags that phase_graph.c references as externs, so
-        -- generated programs link against the Phase Graph runtime without a separate
-        -- shim object (matches m1c.m0's N_ constants).
-        let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");
+        let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_PICK=32,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");
         let _p0 : Int = emit_module_pass0(reg, decls);
         let _n0 : Int = m0_print("\n");
         let _p1 : Int = emit_module_pass1(reg, decls);

@@ -1,0 +1,9 @@
+world ShapeTest {
+    external "m0_print_int" : Int -> Int
+
+    shape Option = | Some(Int) | None
+
+    do main() -> Int {
+        m0_print_int(pick Some(42) { Some(v) -> v; None -> 0 })
+    }
+}

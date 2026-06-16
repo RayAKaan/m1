@@ -1,0 +1,8 @@
+world PickTest {
+    external "m0_print_int" : Int -> Int
+
+    do main() -> Int {
+        set x : Int = 42;
+        m0_print_int(pick x { 42 -> 1; _ -> 0 })
+    }
+}

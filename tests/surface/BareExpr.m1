@@ -1,0 +1,7 @@
+world BareExprTest {
+    external "m0_print_int" : Int -> Int
+
+    do main() -> Int {
+        m0_print_int(1)
+    }
+}

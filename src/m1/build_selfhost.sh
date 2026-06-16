@@ -1,18 +1,7 @@
 #!/usr/bin/env bash
 # Build the self-hosted M1 compiler (m1c) and run the temporal test suite.
-#
-#   bootstrap m0c (C)  ->  compiles m1c.m0 -> C  ->  link -> m1c
-#   m1c  ->  compiles tests/*.m1 -> C  ->  link -> run
-#
-# Requirements: a C compiler (gcc or clang via CC=clang), python3.
-#
-# Notes on robustness (so CI behaves identically across machines):
-#   - We deliberately do NOT use `set -e`: several helpers rely on commands that
-#     return non-zero in the normal case (grep -c with 0 matches, a compiled test
-#     that prints a diagnostic, etc.). Failures are tracked explicitly via the
-#     `fail` counter, and the script exits 1 at the end iff any test failed.
-#   - Every step checks its own result and prints a clear message + the relevant
-#     artifact (generated C / stderr) on failure, so a CI log is self-explanatory.
+# v0.6.0-60: Added pick/shape, bare expressions, say(int) auto-coerce, Windows CI
+
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -28,15 +17,11 @@ FAILED=""
 
 die() { echo "FATAL: $*" >&2; echo "RESULT: FAIL"; exit 1; }
 
-# Count occurrences of a pattern in a file without tripping anything (always prints
-# a plain integer, never errors).
 count() { grep -c "$1" "$2" 2>/dev/null | head -n1 | tr -cd '0-9'; }
 
 echo "[1/5] Build bootstrap m0c from C sources"
 cp "$SRC"/*.c "$SRC"/*.h "$WORK"/ 2>/dev/null || true
-# reduce.c may carry a static/non-static `reduce` mismatch on strict compilers;
-# normalize the copy (no-op if already fixed in the repo).
-sed -i 's/^static Node \*reduce(Node \*n, Reducer \*r);/\/* fwd-decl removed: matches reduce.h *\//' "$WORK/reduce.c" 2>/dev/null || true
+sed -i 's/^static Node \*reduce(Node \*n, Reducer \*r);/\/\* fwd-decl removed: matches reduce.h \*\//' "$WORK/reduce.c" 2>/dev/null || true
 sed -i 's/^static Node \*reduce(Node \*n, Reducer \*r) {/Node *reduce(Node *n, Reducer *r) {/' "$WORK/reduce.c" 2>/dev/null || true
 ( cd "$WORK" && $CC -std=gnu11 -w -fcommon -fno-strict-aliasing -O0 -o m0c \
     main.c arena.c error.c lexer.c parser.c scope.c types.c checker.c reduce.c codegen.c ) \
@@ -49,10 +34,6 @@ echo "[2/5] Compile lexer.m0 -> C, normalize M1Tk tag to int64"
 python3 - "$WORK/lexer_raw.c" "$WORK/lexer_int.c" <<'PY' || die "lexer transform failed"
 import re, sys
 c = open(sys.argv[1]).read()
-# Make the M1Tk sum-type a plain int64 so M1Token.kind ABI matches m1c.m0 (which
-# treats token kinds as Int). This avoids a 4-byte-enum vs 8-byte-int mismatch.
-# Match the struct flexibly (any internal whitespace) so it works regardless of the
-# exact spacing m0c happens to emit.
 c2 = re.sub(
     r'typedef struct M1Tk M1Tk;\s*struct M1Tk\s*\{.*?\}\s*;',
     'typedef int64_t M1Tk;',
@@ -84,16 +65,6 @@ $CC -std=gnu11 -w -fcommon -fno-strict-aliasing -O0 -include "$SRC/m1/compat.h" 
 [ -x "$WORK/m1c" ] || die "m1c was not produced"
 echo "    -> $WORK/m1c"
 
-# ---------------------------------------------------------------------------
-# Test helpers. Each prints PASS/FAIL and, on FAIL, the generated C + stderr so a
-# CI log is self-explanatory. None of them rely on shell error-exit behavior.
-# ---------------------------------------------------------------------------
-
-# Compile a .m1 with the self-hosted m1c and link the result. Sets globals:
-#   COUT  = path to generated C
-#   CERR  = path to m1c stderr (compile-time diagnostics)
-#   ROUT  = program stdout (if it built+ran), RERR = program stderr, REXIT = exit
-# Returns 0 if m1c compiled it (regardless of program result), 1 if m1c failed.
 build_one() {
     local t="$1" f="$2"
     COUT="$WORK/$t.c"; CERR="$WORK/$t.err"; RERR="$WORK/$t.run_err"
@@ -115,7 +86,6 @@ show_fail() {
     echo "    --- $t: cc stderr ---";  sed 's/^/    /' "$WORK/$t.cc" 2>/dev/null
 }
 
-# expect exact program stdout
 check_out() {
     local t="$1" f="$2" expect="$3"
     if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
@@ -129,7 +99,6 @@ check_out() {
     fi
 }
 
-# expect a count of a compile-time diagnostic code in m1c stderr
 check_diag() {
     local t="$1" f="$2" code="$3" expect="$4"
     if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
@@ -144,7 +113,6 @@ check_diag() {
     fi
 }
 
-# expect a count of a runtime diagnostic code in the program's stderr
 check_rdiag() {
     local t="$1" f="$2" code="$3" expect="$4"
     if [ ! -f "$f" ]; then echo "  $t: SKIP (missing $f)"; return; fi
@@ -160,7 +128,7 @@ check_rdiag() {
 }
 
 PG="$ROOT/tests/phase_graph"
-echo "[5/5] Run test suite"
+echo "[5/5] Run test suite (v0.6.0-60: 21 tests)"
 
 echo "  -- Phase Graph (was folding) --"
 check_out WasBasic    "$PG/WasBasic.m1"    1
@@ -185,6 +153,17 @@ check_rdiag WillFail "$ROOT/tests/will/WillFail.m1" M1101 1
 echo "  -- surface syntax (F4) --"
 check_out WorldDoSet "$ROOT/tests/surface/WorldDoSet.m1" 1
 check_out SayInt     "$ROOT/tests/surface/SayInt.m1"     42
+
+echo "  -- pick / shape (v0.6.0-60) --"
+check_out PickBasic  "$ROOT/tests/pick/PickBasic.m1"   1
+check_out ShapeBasic "$ROOT/tests/shape/ShapeBasic.m1" 42
+
+echo "  -- bare expressions (v0.6.0-60) --"
+check_out BareExpr   "$ROOT/tests/surface/BareExpr.m1" 1
+
+echo "  -- say(int) auto-coerce (v0.6.0-60) --"
+check_out   SayIntAuto "$ROOT/tests/surface/SayIntAuto.m1" 42
+check_rdiag SayIntAuto "$ROOT/tests/surface/SayIntAuto.m1" M1100 0
 
 echo "  -- records + function params (W3 Item 1) --"
 check_out RecBasic "$ROOT/tests/records/RecBasic.m1"   3

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y gcc clang python3
+    - name: Build and test
+      run: bash src/m1/build_selfhost.sh
+
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install LLVM
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "18"
+    - name: Build and test
+      shell: pwsh
+      run: |
+        $env:CC = "clang"
+        bash src/m1/build_selfhost.sh
+
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: brew install llvm python3
+    - name: Build and test
+      run: |
+        export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+        export CC=clang
+        bash src/m1/build_selfhost.sh
