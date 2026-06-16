@@ -152,6 +152,7 @@ module M1C {
     let N_NOW : Int = 28
     let N_WHEN : Int = 29
     let N_FOR : Int = 30
+    let N_CONST_DECL : Int = 31
 
     let T_NAMED : Int = 100
     let T_FN : Int = 101
@@ -401,6 +402,14 @@ module M1C {
         let s1 : Int = m0_set(n, 4, ty);
         n
     }
+    -- Module-level constant: `let NAME : T = <expr>` (true self-hosting).
+    -- Holds the name and the value AST node; emitted as a C `#define`.
+    fn n_const_decl(nm : String, v : Int, line : Int, col : Int) -> Int {
+        let n : Int = nk(N_CONST_DECL, line, col, 5);
+        let s0 : Int = m0_store_string(n, 3, nm);
+        let s1 : Int = m0_set(n, 4, v);
+        n
+    }
     fn n_fn_decl(nm : String, params : Int, pc : Int, ret : Int, body : Int, line : Int, col : Int) -> Int {
         let n : Int = nk(N_FN_DECL, line, col, 8);
         let s0 : Int = m0_store_string(n, 3, nm);
@@ -541,7 +550,15 @@ module M1C {
 
     fn gather_args(s : PS, acc : Int) -> PR {
         if ps_kind(s) == TK_RPAREN { mk_pr(rev(acc), ps_adv(s)) } else {
-        if ps_kind(s) == TK_UNIT { mk_pr(rev(acc), ps_adv(s)) } else {
+        if ps_kind(s) == TK_UNIT {
+            -- Bootstrap-dialect zero-arg call `f(())`: the inner `()` lexes as a
+            -- single TK_UNIT. Consume it AND the closing `)` so no stray RPAREN is
+            -- left to derail the rest of the parse. (m1c's own `f()` form is handled
+            -- separately in parse_postfix_loop.) Treated as zero args.
+            let s1 : PS = ps_adv(s);
+            let s2 : PS = if ps_kind(s1) == TK_RPAREN { ps_adv(s1) } else { s1 };
+            mk_pr(rev(acc), s2)
+        } else {
             let r : PR = parse_impl(s);
             let s2 : PS = if ps_kind(r.st) == TK_COMMA { ps_adv(r.st) } else { r.st };
             gather_args(s2, m0_cons(r.node, acc))
@@ -899,10 +916,22 @@ module M1C {
             let tr : PR = parse_type_expr(s2);
             mk_pr(n_extern(cn, tr.node, line, col), tr.st)
         } else {
+        if k == TK_LET {
+            -- Module-level constant `let NAME : T = <value>` (no body; true
+            -- self-hosting). Parse: 'let', name, ':', type, '=', value-expr.
+            let nm : String = ps_str(ps_adv(s));
+            let s_after_name : PS = ps_adv(ps_adv(s));
+            -- s_after_name is at ':'; skip ':' then the type, then '='.
+            let s_after_colon : PS = ps_adv(s_after_name);
+            let tr : PR = parse_type_expr(s_after_colon);
+            let s_after_type : PS = ps_adv(tr.st);
+            let vr : PR = parse_expr(s_after_type);
+            mk_pr(n_const_decl(nm, vr.node, line, col), vr.st)
+        } else {
             -- Unrecognized declaration token: record the error AND advance, so
             -- gather_decls cannot loop forever on the same token (stack overflow).
             mk_pr(n_unit(line, col), ps_err(ps_adv(s)))
-        }}}}
+        }}}}}
     }
 
     fn gather_decls(s : PS, acc : Int) -> PR {
@@ -964,6 +993,25 @@ module M1C {
             if m0_string_eq(reg_name(m0_head(reg)), name) == 1 {
                 m0_head(reg)
             } else { lookup_reg(m0_tail(reg), name) }
+        }
+    }
+
+    -- Does a type's field list contain a field named `fname`? (true self-hosting)
+    fn fields_have(fields : Int, fname : String) -> Int {
+        if m0_is_nil(fields) == 1 { 0 } else {
+            if m0_string_eq(m0_load_string(m0_head(fields), 0), fname) == 1 { 1 }
+            else { fields_have(m0_tail(fields), fname) }
+        }
+    }
+
+    -- Find the record type whose fields include `fname`; returns its C type name,
+    -- or "" if none match. Used to emit a compound-literal cast `(Type){...}` so a
+    -- record literal is valid both as a `let` initializer and as a value position.
+    fn lookup_type_by_field(reg : Int, fname : String) -> String {
+        if m0_is_nil(reg) == 1 { "" } else {
+            if fields_have(reg_fields(m0_head(reg)), fname) == 1 {
+                reg_name(m0_head(reg))
+            } else { lookup_type_by_field(m0_tail(reg), fname) }
         }
     }
 
@@ -1290,11 +1338,22 @@ module M1C {
             m0_print("; })")
         } else {
         if k == N_RECORD {
-            -- Record literal `{ x = 3, y = 7 }`: emit a bare designated-initializer
-            -- `{ .x = 3, .y = 7 }`. The nominal type comes from the binding context
-            -- (e.g. `Point p = { ... }`), so no cast is needed/possible here.
+            -- Record literal `{ x = 3, y = 7 }`. Emit a compound-literal cast
+            -- `(Type){ .x = 3, .y = 7 }` so it is valid both as a `let` initializer
+            -- AND as the value of a statement-expression (e.g. ps_adv's body). The
+            -- type is recovered by matching the first field name against the type
+            -- registry; if unknown, fall back to a bare initializer (true self-host).
+            let fields : Int = m0_get(e, 3);
+            let tnm : String = if m0_is_nil(fields) == 0 {
+                lookup_type_by_field(reg, m0_load_string(m0_head(fields), 0))
+            } else { "" };
+            let _pc : Int = if m0_string_eq(tnm, "") == 0 {
+                let _a : Int = m0_print("(");
+                let _b : Int = m0_print(tnm);
+                m0_print(")")
+            } else { 0 };
             let _p0 : Int = m0_print("{ ");
-            let _p1 : Int = emit_c_expr_ef(reg, m0_get(e, 3), 1);
+            let _p1 : Int = emit_c_expr_ef(reg, fields, 1);
             m0_print(" }")
         } else {
         if k == N_WHILE {
@@ -1484,6 +1543,53 @@ module M1C {
         m0_print("  return _ret;\n}\n")
     }
 
+    -- Emit a forward prototype for a function so callers defined earlier in the
+    -- file link against the correct signature (avoids implicit int() declarations
+    -- and the resulting "conflicting types" errors) (true self-hosting).
+    fn emit_fn_proto(reg : Int, d : Int) -> Int {
+        let nm : String = m0_load_string(d, 3);
+        let params : Int = m0_get(d, 4);
+        let ret : Int = m0_get(d, 6);
+        let is_main : Int = m0_string_eq(nm, "main");
+        if is_main == 1 { 0 } else {
+            let _p0 : Int = emit_c_type(reg, ret);
+            let _p1 : Int = m0_print(" ");
+            let _p2 : Int = m0_print(nm);
+            let _p3 : Int = m0_print("(");
+            let _p4 : Int = emit_fn_ep(reg, params, 1);
+            m0_print(");\n")
+        }
+    }
+
+    fn emit_module_proto(reg : Int, l : Int) -> Int {
+        if m0_is_nil(l) == 1 { 0 } else {
+            let d : Int = m0_head(l);
+            let _e : Int = if m0_get(d, 0) == N_FN_DECL { emit_fn_proto(reg, d) } else { 0 };
+            emit_module_proto(reg, m0_tail(l))
+        }
+    }
+
+    -- Emit module-level constants as C `#define`s (true self-hosting). Placed
+    -- after the hardcoded preamble globals so that, for the 16 phase-graph N_*
+    -- names, the macro just shadows local reads with the identical value while the
+    -- real globals stay exported for phase_graph.c to link against.
+    fn emit_const(reg : Int, d : Int) -> Int {
+        let nm : String = m0_load_string(d, 3);
+        let _p0 : Int = m0_print("#define ");
+        let _p1 : Int = m0_print(nm);
+        let _p2 : Int = m0_print(" (");
+        let _p3 : Int = emit_c_expr(reg, m0_get(d, 4));
+        m0_print(")\n")
+    }
+
+    fn emit_module_pass0(reg : Int, l : Int) -> Int {
+        if m0_is_nil(l) == 1 { 0 } else {
+            let d : Int = m0_head(l);
+            let _e : Int = if m0_get(d, 0) == N_CONST_DECL { emit_const(reg, d) } else { 0 };
+            emit_module_pass0(reg, m0_tail(l))
+        }
+    }
+
     fn emit_module_pass1(reg : Int, l : Int) -> Int {
         if m0_is_nil(l) == 1 { 0 } else {
             let d : Int = m0_head(l);
@@ -1514,15 +1620,21 @@ module M1C {
         let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
         -- Prototype for the Phase Graph runtime query, used by `was` when the
         -- result is undecidable at compile time (pg_query returned -1).
-        let _hq : Int = m0_print("extern int phase_graph_query(const char*, const char*);\n");
+        -- Note: signature must match what m1c's own external declaration emits
+        -- (int64_t, char* not const char*) so self-hosting doesn't conflict.
+        let _hq : Int = m0_print("extern int64_t phase_graph_query(char*, char*);\n");
         -- Emit the AST node-kind tags that phase_graph.c references as externs, so
         -- generated programs link against the Phase Graph runtime without a separate
         -- shim object (matches m1c.m0's N_ constants).
         let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");
+        let _p0 : Int = emit_module_pass0(reg, decls);
+        let _n0 : Int = m0_print("\n");
         let _p1 : Int = emit_module_pass1(reg, decls);
         let _n1 : Int = m0_print("\n");
         let _p2 : Int = emit_module_pass2(reg, decls);
         let _n2 : Int = m0_print("\n");
+        let _pp : Int = emit_module_proto(reg, decls);
+        let _np : Int = m0_print("\n");
         let _p3 : Int = emit_module_pass3(reg, decls);
         0
     }

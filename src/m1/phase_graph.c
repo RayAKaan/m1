@@ -706,7 +706,7 @@ void phase_graph_build(int64_t body_node) {
     walk_node(body_node);
 }
 
-int phase_graph_query(const char *var, const char *phase) {
+int64_t phase_graph_query(char *var, char *phase) {
     int vi = var_index(var);
     if (vi < 0) {
         /* variable never seen – was query is false */
