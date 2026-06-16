@@ -24,6 +24,7 @@ mkdir -p "$WORK"
 
 pass=0
 fail=0
+FAILED=""
 
 die() { echo "FATAL: $*" >&2; echo "RESULT: FAIL"; exit 1; }
 
@@ -107,6 +108,7 @@ build_one() {
 
 show_fail() {
     local t="$1"
+    FAILED="$FAILED $t"
     echo "    --- $t: generated C (main) ---"
     sed -n '/int main/,/^}/p' "$WORK/$t.c" 2>/dev/null | sed 's/^/    /'
     echo "    --- $t: m1c stderr ---"; sed 's/^/    /' "$WORK/$t.err" 2>/dev/null
@@ -169,17 +171,20 @@ check_out WasLive     "$PG/WasLive.m1"     1
 check_out WasValPhase "$PG/WasValPhase.m1" 11110
 
 echo "  -- now re-check (F1) --"
-check_out NowOk      "$ROOT/tests/now/NowOk.m1"      1
-check_out NowRecheck "$ROOT/tests/now/NowRecheck.m1" 1
+check_out   NowOk      "$ROOT/tests/now/NowOk.m1"      10
+check_out   NowRecheck "$ROOT/tests/now/NowRecheck.m1" -5
+check_rdiag NowRecheck "$ROOT/tests/now/NowRecheck.m1" M1100 1
+check_rdiag NowOk      "$ROOT/tests/now/NowOk.m1"      M1100 0
 
 echo "  -- will return guard (F2) --"
-check_out WillOk   "$ROOT/tests/will/WillOk.m1"   1
-check_out WillFail "$ROOT/tests/will/WillFail.m1" 0
+check_out   WillOk   "$ROOT/tests/will/WillOk.m1"   1
+check_out   WillFail "$ROOT/tests/will/WillFail.m1" 0
+check_rdiag WillOk   "$ROOT/tests/will/WillOk.m1"   M1101 0
+check_rdiag WillFail "$ROOT/tests/will/WillFail.m1" M1101 1
 
 echo "  -- surface syntax (F4) --"
 check_out WorldDoSet "$ROOT/tests/surface/WorldDoSet.m1" 1
-check_out SaySay     "$ROOT/tests/surface/SaySay.m1"     ""
-check_out SayInt     "$ROOT/tests/surface/SayInt.m1"     ""
+check_out SayInt     "$ROOT/tests/surface/SayInt.m1"     42
 
 echo "  -- records + function params (W3 Item 1) --"
 check_out RecBasic "$ROOT/tests/records/RecBasic.m1"   3
@@ -195,5 +200,9 @@ check_out CondNoFold   "$ROOT/tests/branch/CondNoFold.m1"   0
 check_out StraightFold "$ROOT/tests/branch/StraightFold.m1" 1
 
 echo "Done: $((pass + fail)) checks ran — $pass passed, $fail failed."
-if [ "$fail" -ne 0 ]; then echo "RESULT: FAIL"; exit 1; fi
+if [ "$fail" -ne 0 ]; then
+    echo "FAILED CHECKS:$FAILED"
+    echo "RESULT: FAIL"
+    exit 1
+fi
 echo "RESULT: PASS"
