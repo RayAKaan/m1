@@ -57,9 +57,9 @@ bash src/m1/build_selfhost.sh      # m0c -> m1c -> compile+run all tests
 ```
 
 This builds the C bootstrap (m0c) from source, uses it to compile the self-hosted
-compiler `m1c.m0` into a working `m1c`, then compiles and runs every test,
-printing a final `RESULT: PASS/FAIL` and exiting non-zero on any failure.
-This is exactly what CI runs.
+compiler `m1c.m0` into a working `m1c`, then compiles and runs every test (28
+checks as of v0.6.0-60), printing a final `RESULT: PASS/FAIL` and exiting
+non-zero on any failure. This is exactly what CI runs.
 
 To compile a single program with the self-hosted compiler:
 
@@ -188,14 +188,14 @@ src/m1/       Self-hosted M1 compiler (m1c.exe) + runtime (m0_runtime.c)
 src/m1.c      m1 driver (stdlib injection, compilation orchestration)
 spec/         Formal spec: PEG grammar, types, effects, reduction, evaluation order
 stdlib/       Standard library modules (std.m1, string.m1, vector.m1)
-tests/        Feature-organized suite: freeze/ now/ was/ when/ will/
+tests/        Feature-organized suite: freeze/ now/ was/ when/ will/ pick/ shape/ records/ surface/ branch/ conflict/ functions/
 paper/        Research paper + frozen evidence (paper/evidence/)
 ```
 
 **Bootstrap chain:** `m0c.exe` (C) compiles `.m0` → `m1c.exe` (M0) compiles `.m1`
 to C → clang links against `m0_runtime.c` → final executable.
 
-## Status (v0.6, updated 2026-06-15)
+## Status (v0.6.0-60, updated 2026-06-16)
 
 Most of what this section used to list as "gaps" now works in the self-hosted
 compiler (`src/m1/m1c.m0`), not just the C bootstrap. Reproduce everything below from
@@ -206,8 +206,9 @@ bash src/m1/build_selfhost.sh
 ```
 
 This builds the bootstrap m0c from C, uses it to compile m1c.m0 into a working
-self-hosted m1c, then compiles and runs the full temporal test suite (17/17).
-CI runs this exact pipeline on every push.
+self-hosted m1c, then compiles and runs the full test suite (28/28).
+CI runs this exact pipeline on every push across Linux (gcc/clang), Windows (clang),
+and macOS (clang).
 
 ### Now working in the self-hosted compiler ✅
 
@@ -235,29 +236,39 @@ CI runs this exact pipeline on every push.
   worked); now functions take parameters correctly.
 - **`world`/`do`/`set`/`say`/`show` surface syntax** — the canonical README dialect now
   parses (world=module, do=fn, set [live]=let [live], say=m0_println, show=m0_print).
+- **`shape`/`pick` sum types with constructor matching** — algebraic data types
+  (`shape Option = | Some(Int) | None`) with match/pick and constructor codegen
+  via tagged-union compound literals. Tags emitted as enums. Supported in both
+  surface syntax and AST-level N_MATCH/N_PICK/N_SHAPE nodes.
+- **`say(int)` auto-coercion** — `say(42)` automatically lowers to
+  `m0_println(m0_int_to_string(42))`. No explicit `int_to_string` call needed.
+- **Bare expressions in `do` bodies** — `do main() -> Int { 42 }` works (the
+  expression is the function body). No `set _ = ...` wrapper required.
+- **Multi-platform CI** — GitHub Actions workflows for Linux (gcc-13, clang-18),
+  Windows (clang-cl), and macOS (clang), each running the full `build_selfhost.sh`
+  pipeline.
 
-See `notes/phase1-week1.md`, `notes/phase1-week2.md`, and `notes/phase1-week3.md` for
-the per-feature changelog and verification, and `paper/evidence/test-results.md` for
-the test matrix.
+See `notes/phase1-week1.md`, `notes/phase1-week2.md`, `notes/phase1-week3.md`, and
+`notes/phase1-week4.md` for the per-feature changelog and verification, and
+`paper/evidence/test-results.md` for the test matrix.
 
 ### Remaining gaps / honest caveats
 
-- `say`/`show` take `String` by design (`say : String -> Int`); print a number with
-  `say(int_to_string(x))`. There is intentionally no `say(int)` overload (ergonomic
-  auto-coercion is a candidate for a later cycle).
-- `pick`/`shape` keywords lex but have no self-hosted parser productions yet.
 - `now`/`will` re-checks are coarse — every assignment re-checks all active
   invariants/commitments (correct, but not per-variable scoped).
 - Conditional `was` is conservative (sound but under-approximating at runtime)
   pending genuine runtime phase tracking.
 - Error messages are still rough; advanced temporal features (full interprocedural
   analysis, user-defined phases) remain M2 work.
-- CI is Linux-only (the verified pipeline); Windows CI remains a manual step.
+- `;`-separated bare expressions in `do` bodies are consumed by the parser but
+  not sequenced into a single expression node (N_SEQ is dead code). Use a single
+  expression or `set _ = ... ;` per side effect.
 
 **Honesty note:** This section is kept deliberately current. The aim is to make the gap
 between the paper's vision and the delivered compiler as small and transparent as
-possible — and as of v0.6 Weeks 1-3 that gap is small: the five temporal operators are
-implemented, tested, and free of soundness bugs in the self-hosted artifact.
+possible — and as of v0.6.0-60 that gap is small: the five temporal operators,
+algebraic sum types with pattern matching, and surface syntax are all implemented,
+tested, and free of soundness bugs in the self-hosted artifact.
 
 ## License
 
