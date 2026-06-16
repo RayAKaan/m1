@@ -33,6 +33,11 @@ jobs:
           chmod +x src/m1/build_selfhost.sh
           bash src/m1/build_selfhost.sh
 
+      - name: Verify true self-hosting (stage-1 == stage-2 fixed point)
+        run: |
+          chmod +x src/m1/build_selfhost_stage2.sh
+          bash src/m1/build_selfhost_stage2.sh
+
       - name: Upload generated C/diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
