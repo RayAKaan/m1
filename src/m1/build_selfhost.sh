@@ -178,6 +178,12 @@ echo "  -- branch-aware soundness (W3 Item 3) --"
 check_out CondNoFold   "$ROOT/tests/branch/CondNoFold.m1"   0
 check_out StraightFold "$ROOT/tests/branch/StraightFold.m1" 1
 
+echo "  -- type checker (Week 5) --"
+check_diag   TcCond  "$ROOT/tests/typecheck/TcCond.m1"  M1200 1
+check_diag   TcArith "$ROOT/tests/typecheck/TcArith.m1" M1201 1
+check_diag   TcClean "$ROOT/tests/typecheck/TcClean.m1" M1200 0
+check_out    TcClean "$ROOT/tests/typecheck/TcClean.m1" 6
+
 echo "Done: $((pass + fail)) checks ran — $pass passed, $fail failed."
 if [ "$fail" -ne 0 ]; then
     echo "FAILED CHECKS:$FAILED"

@@ -16,6 +16,8 @@ module M1C {
     external "m0_list_length" : Int -> Int
     external "m0_get_env" : String -> String
     external "m0_int_to_string" : Int -> String
+    external "m0_eprint" : String -> Int
+    external "m0_eprint_int" : Int -> Int
 
     external "phase_graph_init" : Unit -> Int
     external "phase_graph_record" : String -> String -> Int
@@ -1703,9 +1705,267 @@ module M1C {
         }
     }
 
+    -- ============================================================
+    -- Type checker (Week 5 — M1200 / M1201, sound subset)
+    -- ============================================================
+
+    fn tc_box(v : Int) -> Int {
+        let c : Int = m0_alloc(1);
+        let s : Int = m0_set(c, 0, v);
+        c
+    }
+
+    fn tc_get(c : Int) -> Int { m0_get(c, 0) }
+    fn tc_set(c : Int, v : Int) -> Int { m0_set(c, 0, v) }
+
+    fn tc_diag(c : Int, code : String, msg : String) -> Int {
+        let n : Int = tc_get(c);
+        let s1 : Int = m0_eprint(code);
+        let s2 : Int = m0_eprint(": ");
+        let s3 : Int = m0_eprint(msg);
+        let s4 : Int = m0_eprint("\n");
+        tc_set(c, n + 1)
+    }
+
+    fn tc_is_num(tn : String) -> Int {
+        if m0_string_eq(tn, "Int") == 1 { 1 } else {
+        if m0_string_eq(tn, "Float") == 1 { 1 } else { 0 }}
+    }
+
+    fn tc_is_boolish(tn : String) -> Int {
+        if m0_string_eq(tn, "Bool") == 1 { 1 } else { 0 }
+    }
+
+    fn tenv_bind(tenv : Int, nm : String, tn : String) -> Int {
+        let e : Int = m0_alloc(2);
+        let _s0 : Int = m0_store_string(e, 0, nm);
+        let _s1 : Int = m0_store_string(e, 1, tn);
+        m0_cons(e, tenv)
+    }
+
+    fn tenv_lookup(tenv : Int, nm : String) -> String {
+        if m0_is_nil(tenv) == 1 { "" } else {
+            let e : Int = m0_head(tenv);
+            if m0_string_eq(m0_load_string(e, 0), nm) == 1 {
+                m0_load_string(e, 1)
+            } else { tenv_lookup(m0_tail(tenv), nm) }
+        }
+    }
+
+    fn tc_expr(reg : Int, tenv : Int, dc : Int, e : Int) -> String {
+        let k : Int = m0_get(e, 0);
+        if k == N_INT { "Int" } else {
+        if k == N_STRING { "String" } else {
+        if k == N_BOOL { "Bool" } else {
+        if k == N_UNIT { "Unit" } else {
+        if k == N_NAME {
+            let nm : String = m0_load_string(e, 3);
+            let t : String = tenv_lookup(tenv, nm);
+            if m0_string_eq(t, "") == 1 {
+                let r : Int = lookup_reg(reg, nm);
+                if r == 0 { "" } else { m0_load_string(r, 0) }
+            } else { t }
+        } else {
+        if k == N_NOT {
+            let sub : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            if m0_string_eq(sub, "") == 1 { "" } else {
+            if tc_is_boolish(sub) == 0 {
+                let _d : Int = tc_diag(dc, "M1200", "non-boolean operand in not");
+                ""
+            } else { "Bool" }}
+        } else {
+        if k == N_BINARY {
+            let op : Int = m0_get(e, 3);
+            let l : String = tc_expr(reg, tenv, dc, m0_get(e, 4));
+            let r : String = tc_expr(reg, tenv, dc, m0_get(e, 5));
+            if op == OP_AND {
+                let _dl : Int = if m0_string_eq(l, "") == 0 {
+                    if tc_is_boolish(l) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                let _dr : Int = if m0_string_eq(r, "") == 0 {
+                    if tc_is_boolish(r) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                "Bool"
+            } else {
+            if op == OP_OR {
+                let _dl : Int = if m0_string_eq(l, "") == 0 {
+                    if tc_is_boolish(l) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                let _dr : Int = if m0_string_eq(r, "") == 0 {
+                    if tc_is_boolish(r) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                "Bool"
+            } else {
+            if op == OP_IMPL {
+                let _dl : Int = if m0_string_eq(l, "") == 0 {
+                    if tc_is_boolish(l) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                let _dr : Int = if m0_string_eq(r, "") == 0 {
+                    if tc_is_boolish(r) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                "Bool"
+            } else {
+            if op == OP_IFF {
+                let _dl : Int = if m0_string_eq(l, "") == 0 {
+                    if tc_is_boolish(l) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                let _dr : Int = if m0_string_eq(r, "") == 0 {
+                    if tc_is_boolish(r) == 0 { tc_diag(dc, "M1200", "non-boolean operand in bool op") } else { 0 }
+                } else { 0 };
+                "Bool"
+            } else {
+            if op == OP_EQ { "Bool" } else {
+            if op == OP_NEQ { "Bool" } else {
+            if op == OP_LT { "Bool" } else {
+            if op == OP_GT { "Bool" } else {
+            if op == OP_LE { "Bool" } else {
+            if op == OP_GE { "Bool" } else {
+                let _al : Int = if m0_string_eq(l, "") == 0 {
+                    if tc_is_num(l) == 0 { tc_diag(dc, "M1201", "arithmetic on non-numeric operand") } else { 0 }
+                } else { 0 };
+                let _ar : Int = if m0_string_eq(r, "") == 0 {
+                    if tc_is_num(r) == 0 { tc_diag(dc, "M1201", "arithmetic on non-numeric operand") } else { 0 }
+                } else { 0 };
+                if m0_string_eq(l, "") == 1 { "" } else {
+                if m0_string_eq(r, "") == 1 { "" } else {
+                if tc_is_num(l) == 1 {
+                    if tc_is_num(r) == 1 { "Int" } else { "" }
+                } else { "" }}
+                }
+            }}}}}}}}}}
+        } else {
+        if k == N_FIELD {
+            let sub : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let fnm : String = m0_load_string(e, 4);
+            if m0_string_eq(sub, "") == 1 { "" } else {
+                let entry : Int = lookup_reg(reg, sub);
+                if entry == 0 { "" } else {
+                    let fields : Int = reg_fields(entry);
+                    if fields_have(fields, fnm) == 1 { "" } else {
+                        let _d : Int = tc_diag(dc, "M1202", "unknown field");
+                        ""
+                    }
+                }
+            }
+        } else {
+        if k == N_CALL {
+            let fnn : Int = m0_get(e, 3);
+            let args : Int = m0_get(e, 4);
+            let fn_tn : String = tc_expr(reg, tenv, dc, fnn);
+            if m0_string_eq(fn_tn, "") == 1 { "" } else {
+                let entry : Int = lookup_reg(reg, fn_tn);
+                if entry == 0 { "" } else { "" }
+            }
+        } else {
+        if k == N_IF {
+            let ctn : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let _dc : Int = if m0_string_eq(ctn, "") == 0 {
+                if tc_is_boolish(ctn) == 0 { tc_diag(dc, "M1200", "non-boolean if condition") } else { 0 }
+            } else { 0 };
+            let _tt : String = tc_expr(reg, tenv, dc, m0_get(e, 4));
+            let el : Int = m0_get(e, 5);
+            let _et : String = if el != 0 { tc_expr(reg, tenv, dc, el) } else { "Unit" };
+            ""
+        } else {
+        if k == N_WHILE {
+            let ctn : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let _dc : Int = if m0_string_eq(ctn, "") == 0 {
+                if tc_is_boolish(ctn) == 0 { tc_diag(dc, "M1200", "non-boolean while condition") } else { 0 }
+            } else { 0 };
+            let _bt : String = tc_expr(reg, tenv, dc, m0_get(e, 4));
+            "Unit"
+        } else {
+        if k == N_WHEN {
+            let ctn : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let _dc : Int = if m0_string_eq(ctn, "") == 0 {
+                if tc_is_boolish(ctn) == 0 { tc_diag(dc, "M1200", "non-boolean when condition") } else { 0 }
+            } else { 0 };
+            let _bt : String = tc_expr(reg, tenv, dc, m0_get(e, 4));
+            ""
+        } else {
+        if k == N_NOW {
+            let ctn : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let _dc : Int = if m0_string_eq(ctn, "") == 0 {
+                if tc_is_boolish(ctn) == 0 { tc_diag(dc, "M1200", "non-boolean now condition") } else { 0 }
+            } else { 0 };
+            ""
+        } else {
+        if k == N_WILL {
+            let ctn : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            let _dc : Int = if m0_string_eq(ctn, "") == 0 {
+                if tc_is_boolish(ctn) == 0 { tc_diag(dc, "M1200", "non-boolean will condition") } else { 0 }
+            } else { 0 };
+            ""
+        } else {
+        if k == N_LET {
+            let nm : String = m0_load_string(e, 3);
+            let vt : String = tc_expr(reg, tenv, dc, m0_get(e, 5));
+            let tenv2 : Int = tenv_bind(tenv, nm, vt);
+            tc_expr(reg, tenv2, dc, m0_get(e, 6))
+        } else {
+        if k == N_LIVE {
+            let nm : String = m0_load_string(e, 3);
+            let vt : String = tc_expr(reg, tenv, dc, m0_get(e, 5));
+            let tenv2 : Int = tenv_bind(tenv, nm, vt);
+            tc_expr(reg, tenv2, dc, m0_get(e, 6))
+        } else {
+        if k == N_ASSIGN {
+            let nm : String = m0_load_string(e, 3);
+            let _vt : String = tc_expr(reg, tenv, dc, m0_get(e, 4));
+            tenv_lookup(tenv, nm)
+        } else {
+        if k == N_SEQ {
+            let _ft : String = tc_expr(reg, tenv, dc, m0_get(e, 3));
+            tc_expr(reg, tenv, dc, m0_get(e, 4))
+        } else {
+        if k == N_RECORD { "" } else {
+        if k == N_MATCH { "" } else {
+        if k == N_PICK { "" } else {
+        if k == N_SHAPE { "" } else {
+        if k == N_FREEZE { "" } else {
+        if k == N_WAS { "" } else {
+        ""
+        }        }}}}}}}}}}}}}}}}}}}}}}}}
+
+    fn typecheck_module(reg : Int, decls : Int) -> Int {
+        let dc : Int = tc_box(0);
+        let _tc : Int = tc_module_decls(reg, dc, decls, m0_nil);
+        tc_get(dc)
+    }
+
+    fn tc_module_decls(reg : Int, dc : Int, decls : Int, tenv : Int) -> Int {
+        if m0_is_nil(decls) == 1 { 0 } else {
+            let d : Int = m0_head(decls);
+            let dk : Int = m0_get(d, 0);
+            let _t : Int = if dk == N_FN_DECL {
+                let nm : String = m0_load_string(d, 3);
+                let params : Int = m0_get(d, 4);
+                let body : Int = m0_get(d, 7);
+                let param_tenv : Int = tc_bind_params(tenv, params);
+                let _bt : String = tc_expr(reg, param_tenv, dc, body);
+                0
+            } else { 0 };
+            tc_module_decls(reg, dc, m0_tail(decls), tenv)
+        }
+    }
+
+    fn tc_bind_params(tenv : Int, params : Int) -> Int {
+        if m0_is_nil(params) == 1 { tenv } else {
+            let p : Int = m0_head(params);
+            let nm : String = m0_load_string(p, 0);
+            let ty : Int = m0_get(p, 1);
+            let tn : String = if m0_get(ty, 0) == T_NAMED {
+                m0_load_string(ty, 3)
+            } else { "" };
+            let tenv2 : Int = tenv_bind(tenv, nm, tn);
+            tc_bind_params(tenv2, m0_tail(params))
+        }
+    }
+
     fn emit_module(m : Int) -> Int {
         let decls : Int = m0_get(m, 4);
         let reg : Int = build_reg(decls, m0_nil);
+        let _n_diag : Int = typecheck_module(reg, decls);
         let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
         let _hq : Int = m0_print("extern int64_t phase_graph_query(char*, char*);\n");
         let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_PICK=32,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");

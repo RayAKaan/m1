@@ -1,0 +1,12 @@
+module TcClean {
+    external "m0_print_int" : Int -> Int
+    fn id(x : Int) -> Int { x }
+    fn main() -> Int {
+        let x : Int = 3;
+        let y : Bool = true;
+        let z : Int = if y { x } else { id(2) };
+        let w : Int = z + 3;
+        let _ : Int = m0_print_int(w);
+        0
+    }
+}

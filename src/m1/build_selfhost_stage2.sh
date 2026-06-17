@@ -58,7 +58,8 @@ diffs=0; n=0
 for f in "$ROOT"/tests/phase_graph/*.m1 "$ROOT"/tests/now/*.m1 "$ROOT"/tests/will/*.m1 \
          "$ROOT"/tests/surface/*.m1 "$ROOT"/tests/records/*.m1 "$ROOT"/tests/functions/FnParam.m1 \
          "$ROOT"/tests/conflict/*.m1 "$ROOT"/tests/branch/*.m1 "$ROOT"/tests/sumtypes/*.m1 \
-         "$ROOT"/tests/pick/*.m1 "$ROOT"/tests/shape/*.m1; do
+         "$ROOT"/tests/pick/*.m1 "$ROOT"/tests/shape/*.m1 \
+         "$ROOT"/tests/typecheck/*.m1; do
     [ -f "$f" ] || continue
     n=$((n+1))
     M1_SOURCE="$f" "$WORK/m1c1" > "$WORK/a.c" 2>/dev/null

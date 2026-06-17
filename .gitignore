@@ -44,6 +44,34 @@ tests/build/*
 Thumbs.db
 Desktop.ini
 
+# ===== M1 compiler bootstrap/generated artifacts =====
+m1c_self*.c
+m1c_self*.err
+m1c_head_self*
+m1c_out_tmp.c
+m1c_self_stage*.c
+lexer_int.c
+lexer_raw.c
+lexer_raw.err
+lexer_transform.py
+link.err
+ps_cc.c
+out.c
+picktest.c
+stage1.err
+$outFile
+src/m1/_mini.c
+src/m1/_tbf.m1
+src/m1/_tbw.m1
+src/m1/_test*.c
+src/m1/_test*.m1
+src/m1/_tv_*.c
+src/m1/m1c_head.m0
+src/m1/m1c_out_tmp.c
+src/m1/t_*
+src/m1/test_*.c
+tests/sumtypes/
+
 # ===== Exceptions: real source that must never be ignored =====
 !src/m0_runtime.c
 !src/runtime/m0_runtime.c

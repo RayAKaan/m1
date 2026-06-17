@@ -1,0 +1,6 @@
+module TcArith {
+    fn main() -> Int {
+        let x : Bool = true;
+        x + 1
+    }
+}

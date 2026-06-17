@@ -1,0 +1,5 @@
+module TcCond {
+    fn main() -> Int {
+        if 42 { 1 } else { 0 }
+    }
+}

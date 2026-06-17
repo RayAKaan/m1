@@ -52,6 +52,16 @@ int64_t m0_print_int(int64_t v) {
     return 0;
 }
 
+int64_t m0_eprint(const char* s) {
+    if (s) fputs(s, stderr);
+    return 0;
+}
+
+int64_t m0_eprint_int(int64_t v) {
+    fprintf(stderr, "%lld", (long long)v);
+    return 0;
+}
+
 int64_t m0_print_char(int64_t c) {
     putchar((char)c);
     return 0;
