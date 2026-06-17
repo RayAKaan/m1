@@ -40,6 +40,59 @@ extern int64_t  m0_head(int64_t list);
 extern int64_t  m0_tail(int64_t list);
 
 /* -------------------------------------------------------------------
+ * String Interning (Phase 2)
+ * ------------------------------------------------------------------ */
+#define MAX_STRINGS 512
+static char string_pool[MAX_STRINGS][64];
+static int  string_count;
+
+static uint32_t intern_string(const char *s) {
+    if (!s) return 0;
+    for (int i = 0; i < string_count; i++)
+        if (strcmp(string_pool[i], s) == 0) return (uint32_t)(i + 1);
+    if (string_count >= MAX_STRINGS) return 0;
+    strncpy_s(string_pool[string_count], 64, s, _TRUNCATE);
+    return (uint32_t)(string_count++) + 1;
+}
+
+VarID   phase_graph_intern_var(const char *var)   { return intern_string(var); }
+PhaseID phase_graph_intern_phase(const char *ph)  { return intern_string(ph); }
+
+/* -------------------------------------------------------------------
+ * Constraint Dependency Graph (Phase 2)
+ * ------------------------------------------------------------------ */
+#define MAX_DEPS 1024
+typedef struct { char var[64]; int64_t node; } Dependency;
+static Dependency deps[MAX_DEPS];
+static int dep_count;
+
+int64_t phase_graph_add_dep(const char *var, int64_t cond_node) {
+    if (dep_count >= MAX_DEPS) return 0;
+    strncpy_s(deps[dep_count].var, 64, var, _TRUNCATE);
+    deps[dep_count].node = cond_node;
+    dep_count++;
+    return 1;
+}
+
+int64_t phase_graph_now_recheck_count_for_var(const char *var) {
+    int n = 0;
+    for (int i = 0; i < dep_count; i++)
+        if (strcmp(deps[i].var, var) == 0) n++;
+    return n;
+}
+
+int64_t phase_graph_now_recheck_get_node_for_var(const char *var, int64_t i) {
+    int idx = 0;
+    for (int j = 0; j < dep_count; j++) {
+        if (strcmp(deps[j].var, var) == 0) {
+            if (idx == (int)i) return deps[j].node;
+            idx++;
+        }
+    }
+    return 0;
+}
+
+/* -------------------------------------------------------------------
  * Data structures
  * ------------------------------------------------------------------ */
 #define MAX_VARS    64
@@ -551,7 +604,11 @@ int64_t phase_graph_constraint_check(const char *var, int64_t op,
     return conflict;
 }
 
-void phase_graph_constraint_reset(void) { constraint_count = 0; }
+void phase_graph_constraint_reset(void) {
+    constraint_count = 0;
+    dep_count = 0;
+    string_count = 0;
+}
 
 /* -------------------------------------------------------------------
  * Branch-aware phase tracking (Week 3, Item 3)

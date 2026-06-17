@@ -128,7 +128,7 @@ check_rdiag() {
 }
 
 PG="$ROOT/tests/phase_graph"
-echo "[5/5] Run test suite (v0.7.0: 34 tests)"
+echo "[5/5] Run test suite (v0.8.0: 33 tests)"
 
 echo "  -- Phase Graph (was folding) --"
 check_out WasBasic    "$PG/WasBasic.m1"    1

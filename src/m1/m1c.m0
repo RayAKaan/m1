@@ -30,6 +30,11 @@ module M1C {
     external "phase_graph_will_guard_declare" : Int -> Int
     external "phase_graph_will_guard_count" : Unit -> Int
     external "phase_graph_will_guard_get_node" : Int -> Int
+    external "phase_graph_add_dep" : String -> Int -> Int
+    external "phase_graph_now_recheck_count_for_var" : String -> Int
+    external "phase_graph_now_recheck_get_node_for_var" : String -> Int -> Int
+    external "phase_graph_intern_var" : String -> Int
+    external "phase_graph_intern_phase" : String -> Int
     external "phase_graph_constraint_check" : String -> Int -> Int -> Int -> Int
     external "phase_graph_enter_branch" : Unit -> Int
     external "phase_graph_exit_branch" : Unit -> Int
@@ -45,6 +50,11 @@ module M1C {
     fn pg_wg_declare(cond : Int) -> Int { phase_graph_will_guard_declare(cond) }
     fn pg_wg_count() -> Int { phase_graph_will_guard_count(()) }
     fn pg_wg_get_node(i : Int) -> Int { phase_graph_will_guard_get_node(i) }
+    fn pg_add_dep(v : String, n : Int) -> Int { phase_graph_add_dep(v, n) }
+    fn pg_rc_count_for_var(v : String) -> Int { phase_graph_now_recheck_count_for_var(v) }
+    fn pg_rc_get_node_for_var(v : String, i : Int) -> Int { phase_graph_now_recheck_get_node_for_var(v, i) }
+    fn pg_intern_var(v : String) -> Int { phase_graph_intern_var(v) }
+    fn pg_intern_phase(p : String) -> Int { phase_graph_intern_phase(p) }
     fn pg_constraint(v : String, op : Int, val : Int, kind : Int) -> Int { phase_graph_constraint_check(v, op, val, kind) }
     fn pg_enter_branch() -> Int { phase_graph_enter_branch(()) }
     fn pg_exit_branch() -> Int { phase_graph_exit_branch(()) }
@@ -1302,6 +1312,34 @@ module M1C {
         }
     }
 
+    fn emit_now_add_deps(cond : Int, vars : Int) -> Int {
+        if m0_is_nil(vars) == 1 { 0 } else {
+            let vnode : Int = m0_head(vars);
+            let vn : String = m0_load_string(vnode, 3);
+            let _d : Int = pg_add_dep(vn, cond);
+            emit_now_add_deps(cond, m0_tail(vars))
+        }
+    }
+
+    fn emit_now_rechecks_for_var(reg : Int, nm : String) -> Int {
+        let cnt : Int = pg_rc_count_for_var(nm);
+        emit_now_rechecks_for_var_loop(reg, nm, 0, cnt)
+    }
+
+    fn emit_now_rechecks_for_var_loop(reg : Int, nm : String, i : Int, n : Int) -> Int {
+        if i >= n { 0 } else {
+            let node : Int = pg_rc_get_node_for_var(nm, i);
+            let _c0 : Int = m0_print(", ({ if (!(");
+            let _c1 : Int = emit_c_expr(reg, node);
+            let _c2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated at line ");
+            let _c3 : Int = m0_print_int(m0_get(node, 1));
+            let _c4 : Int = m0_print(", col ");
+            let _c5 : Int = m0_print_int(m0_get(node, 2));
+            let _c6 : Int = m0_print("\\n\"); } 0; })");
+            emit_now_rechecks_for_var_loop(reg, nm, i + 1, n)
+        }
+    }
+
     fn will_emit_updates(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
             let _u0 : Int = m0_print(", (_will_flags[");
@@ -1361,6 +1399,47 @@ module M1C {
         if k == N_NAME { m0_load_string(node, 3) } else {
         if k == N_FIELD { extract_var_name(m0_get(node, 3)) } else {
         "" }}
+    }
+
+    fn find_vars(node : Int, acc : Int) -> Int {
+        if node == 0 { acc } else {
+            let k : Int = m0_get(node, 0);
+            if k == N_NAME { m0_cons(node, acc) } else {
+            if k == N_BINARY {
+                let a1 : Int = find_vars(m0_get(node, 4), acc);
+                find_vars(m0_get(node, 5), a1)
+            } else {
+            if k == N_NOT { find_vars(m0_get(node, 3), acc) } else {
+            if k == N_FIELD { find_vars(m0_get(node, 3), acc) } else {
+            if k == N_CALL {
+                let a1 : Int = find_vars(m0_get(node, 3), acc);
+                find_vars_list(m0_get(node, 4), a1)
+            } else {
+            if k == N_SEQ {
+                let a1 : Int = find_vars(m0_get(node, 3), acc);
+                find_vars(m0_get(node, 4), a1)
+            } else {
+            if k == N_IF {
+                let a1 : Int = find_vars(m0_get(node, 3), acc);
+                let a2 : Int = find_vars(m0_get(node, 4), a1);
+                find_vars(m0_get(node, 5), a2)
+            } else {
+            if k == N_NOW { find_vars(m0_get(node, 3), acc) } else {
+            if k == N_WILL { find_vars(m0_get(node, 3), acc) } else {
+            if k == N_WHEN {
+                let a1 : Int = find_vars(m0_get(node, 3), acc);
+                find_vars(m0_get(node, 4), a1)
+            } else {
+            acc
+            }}}}}}}}}}
+        }
+    }
+
+    fn find_vars_list(l : Int, acc : Int) -> Int {
+        if m0_is_nil(l) == 1 { acc } else {
+            let a1 : Int = find_vars(m0_head(l), acc);
+            find_vars_list(m0_tail(l), a1)
+        }
     }
 
     fn emit_c_expr(reg : Int, e : Int) -> Int {
@@ -1518,7 +1597,7 @@ module M1C {
             let _p1 : Int = m0_print(nm);
             let _p2 : Int = m0_print(" = ");
             let _p3 : Int = emit_c_expr(reg, rhs);
-            let _rc : Int = now_emit_rechecks(reg, 0, pg_rc_count());
+            let _rc : Int = emit_now_rechecks_for_var(reg, nm);
             let _wu : Int = will_emit_updates(reg, 0, pg_wg_count());
             let _p4 : Int = m0_print(", ");
             let _p5 : Int = m0_print(nm);
@@ -1571,11 +1650,18 @@ module M1C {
             m0_print("))")
         } else {
         if k == N_NOW {
-            let _cf : Int = register_constraint(m0_get(e, 3), 0);
-            let _reg : Int = pg_rc_declare(m0_get(e, 3));
+            let cond : Int = m0_get(e, 3);
+            let _cf : Int = register_constraint(cond, 0);
+            let _reg : Int = pg_rc_declare(cond);
+            let vars : Int = find_vars(cond, m0_nil);
+            let _ad : Int = emit_now_add_deps(cond, vars);
             let _p0 : Int = m0_print("({ if (!(");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
-            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
+            let _p1 : Int = emit_c_expr(reg, cond);
+            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated at line ");
+            let _p3 : Int = m0_print_int(m0_get(cond, 1));
+            let _p4 : Int = m0_print(", col ");
+            let _p5 : Int = m0_print_int(m0_get(cond, 2));
+            let _p6 : Int = m0_print("\\n\"); } 0; })");
             0
         } else {
         if k == N_WHEN {
@@ -1992,6 +2078,9 @@ module M1C {
         let _n_diag : Int = typecheck_module(reg, decls);
         let _h : Int = m0_print("#include <stdio.h>\n#include <stdint.h>\n");
         let _hq : Int = m0_print("extern int64_t phase_graph_query(char*, char*);\n");
+        let _hd : Int = m0_print("extern int64_t phase_graph_add_dep(char*, int64_t);\n");
+        let _hc : Int = m0_print("extern int64_t phase_graph_now_recheck_count_for_var(char*);\n");
+        let _hg : Int = m0_print("extern int64_t phase_graph_now_recheck_get_node_for_var(char*, int64_t);\n");
         let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_PICK=32,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");
         let _p0 : Int = emit_module_pass0(reg, decls);
         let _n0 : Int = m0_print("\n");
