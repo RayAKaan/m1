@@ -128,7 +128,7 @@ check_rdiag() {
 }
 
 PG="$ROOT/tests/phase_graph"
-echo "[5/5] Run test suite (v0.6.0-60: 21 tests)"
+echo "[5/5] Run test suite (v0.7.0: 34 tests)"
 
 echo "  -- Phase Graph (was folding) --"
 check_out WasBasic    "$PG/WasBasic.m1"    1
@@ -183,6 +183,9 @@ check_diag   TcCond  "$ROOT/tests/typecheck/TcCond.m1"  M1200 1
 check_diag   TcArith "$ROOT/tests/typecheck/TcArith.m1" M1201 1
 check_diag   TcClean "$ROOT/tests/typecheck/TcClean.m1" M1200 0
 check_out    TcClean "$ROOT/tests/typecheck/TcClean.m1" 6
+
+echo "  -- N_SEQ expression sequencing (Phase 1) --"
+check_out    SeqBasic "$ROOT/tests/seq/SeqBasic.m1" 4
 
 echo "Done: $((pass + fail)) checks ran — $pass passed, $fail failed."
 if [ "$fail" -ne 0 ]; then

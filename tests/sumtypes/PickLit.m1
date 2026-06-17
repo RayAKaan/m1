@@ -1,0 +1,11 @@
+world W {
+    external "m0_print_int" : Int -> Int
+    fn main() -> Int {
+        let _ : Int = m0_print_int(pick 1 {
+            0 -> 0;
+            1 -> 110;
+            _ -> 999;
+        });
+        0
+    }
+}

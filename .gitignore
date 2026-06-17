@@ -70,7 +70,6 @@ src/m1/m1c_head.m0
 src/m1/m1c_out_tmp.c
 src/m1/t_*
 src/m1/test_*.c
-tests/sumtypes/
 
 # ===== Exceptions: real source that must never be ignored =====
 !src/m0_runtime.c

@@ -288,6 +288,12 @@ module M1C {
         let s1 : Int = m0_set(n, 4, body);
         n
     }
+    fn n_seq(l : Int, r : Int, line : Int, col : Int) -> Int {
+        let n : Int = nk(N_SEQ, line, col, 5);
+        let s0 : Int = m0_set(n, 3, l);
+        let s1 : Int = m0_set(n, 4, r);
+        n
+    }
     fn n_live(nm : String, ty : Int, val : Int, body : Int, line : Int, col : Int) -> Int {
         let n : Int = nk(N_LIVE, line, col, 7);
         let s0 : Int = m0_store_string(n, 3, nm);
@@ -669,14 +675,22 @@ module M1C {
         } else { r }
     }
 
+    fn parse_seq(s : PS) -> PR {
+        let r : PR = parse_impl(s);
+        if ps_kind(r.st) == TK_COMMA {
+            let r2 : PR = parse_seq(ps_adv(r.st));
+            mk_pr(n_seq(r.node, r2.node, ps_line(r.st), ps_col(r.st)), r2.st)
+        } else { r }
+    }
+
     fn parse_expr(s : PS) -> PR {
         if ps_kind(s) == TK_BIDI {
-            let r1 : PR = parse_impl(ps_adv(s));
+            let r1 : PR = parse_seq(ps_adv(s));
             if ps_kind(r1.st) == TK_BIDI {
-                let r2 : PR = parse_impl(ps_adv(r1.st));
+                let r2 : PR = parse_seq(ps_adv(r1.st));
                 mk_pr(n_bin(OP_IFF, r1.node, r2.node, ps_line(s), ps_col(s)), r2.st)
             } else { mk_pr(r1.node, ps_err(r1.st)) }
-        } else { parse_impl(s) }
+        } else { parse_seq(s) }
     }
 
     fn gather_arms(s : PS, acc : Int) -> PR {
@@ -1276,9 +1290,14 @@ module M1C {
 
     fn now_emit_rechecks(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
+            let node : Int = pg_rc_get_node(i);
             let _c0 : Int = m0_print(", ({ if (!(");
-            let _c1 : Int = emit_c_expr(reg, pg_rc_get_node(i));
-            let _c2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated\\n\"); } 0; })");
+            let _c1 : Int = emit_c_expr(reg, node);
+            let _c2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated at line ");
+            let _c3 : Int = m0_print_int(m0_get(node, 1));
+            let _c4 : Int = m0_print(", col ");
+            let _c5 : Int = m0_print_int(m0_get(node, 2));
+            let _c6 : Int = m0_print("\\n\"); } 0; })");
             now_emit_rechecks(reg, i + 1, n)
         }
     }
@@ -1298,9 +1317,14 @@ module M1C {
 
     fn will_emit_guards(reg : Int, i : Int, n : Int) -> Int {
         if i >= n { 0 } else {
+            let node : Int = pg_wg_get_node(i);
             let _g0 : Int = m0_print("  if (!_will_flags[");
             let _g1 : Int = m0_print_int(i);
-            let _g2 : Int = m0_print("]) { fprintf(stderr, \"[M1101] will commitment unmet\\n\"); }\n");
+            let _g2 : Int = m0_print("]) { fprintf(stderr, \"[M1101] will commitment unmet at line ");
+            let _g3 : Int = m0_print_int(m0_get(node, 1));
+            let _g4 : Int = m0_print(", col ");
+            let _g5 : Int = m0_print_int(m0_get(node, 2));
+            let _g6 : Int = m0_print("\\n\"); }\n");
             will_emit_guards(reg, i + 1, n)
         }
     }

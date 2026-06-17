@@ -1,0 +1,9 @@
+world W {
+    external "m0_print_int" : Int -> Int
+    shape Point = { x : Int, y : Int }
+    fn main() -> Int {
+        let p : Point = { x = 3, y = 7 };
+        let _ : Int = m0_print_int(p.x + p.y);
+        0
+    }
+}

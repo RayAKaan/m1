@@ -1,0 +1,9 @@
+module SeqBasic {
+    external "m0_print_int" : Int -> Int
+
+    fn main() -> Int {
+        let x: Int = (1, 2) in
+        let y: Int = (x + 1, x + 2) in
+        m0_print_int(y)
+    }
+}
