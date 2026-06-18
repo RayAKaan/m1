@@ -82,7 +82,9 @@ enum M1Tk_tag {
   M1Tk_TkLive,
   M1Tk_TkSay,
   M1Tk_TkShow,
-  M1Tk_TkThen
+  M1Tk_TkThen,
+  M1Tk_TkRequires,
+  M1Tk_TkEnsures
 };
 typedef struct {
   M1Tk kind;  
@@ -368,6 +370,14 @@ static inline M1Tk TkThen() {
   M1Tk v = { .tag = M1Tk_TkThen, .data = {0} };
   return v;
 }
+static inline M1Tk TkRequires() {
+  M1Tk v = { .tag = M1Tk_TkRequires, .data = {0} };
+  return v;
+}
+static inline M1Tk TkEnsures() {
+  M1Tk v = { .tag = M1Tk_TkEnsures, .data = {0} };
+  return v;
+}
 M1Token mk_tok(M1Tk kind, int64_t line, int64_t col);
 M1Token mk_int_tok(int64_t val, int64_t line, int64_t col);
 M1Token mk_str_tok(M1Tk kind, char* val, int64_t line, int64_t col);
@@ -607,10 +617,20 @@ M1Token keyword_or_ident(char* s, int64_t line, int64_t col) {
                                                         } else {                                                          
                                                                                                                     if 
 (m0_string_eq(s, "then") == 1) {                                                            
-                                                            return mk_str_tok(TkThen(), s, line, col);                                                          
-                                                          } else {                                                            
-                                                            return mk_str_tok(TkIdent(), s, line, col);                                                          
-                                                          }                                                        
+                                                             return mk_str_tok(TkThen(), s, line, col);                                                          
+                                                           } else {                                                            
+                                                                                                                         if 
+(m0_string_eq(s, "requires") == 1) {                                                              
+                                                                   return mk_str_tok(TkRequires(), s, line, col);                                                            
+                                                                 } else {                                                                
+                                                                                                                                     if 
+(m0_string_eq(s, "ensures") == 1) {                                                                      
+                                                                       return mk_str_tok(TkEnsures(), s, line, col);                                                                    
+                                                                     } else {                                                                      
+                                                             return mk_str_tok(TkIdent(), s, line, col);                                                          
+                                                           }                                                                    
+                                                                 }                                                                  
+                                                               }                                                        
                                                         }                                                      
                                                       }                                                    
                                                     }                                                  
@@ -1121,6 +1141,12 @@ k.tag) {      case M1Tk_TkEof: {
       }
       case M1Tk_TkThen: {
         return "THEN";      
+      }
+      case M1Tk_TkRequires: {
+        return "REQUIRES";      
+      }
+      case M1Tk_TkEnsures: {
+        return "ENSURES";      
       }
       default: { return 0; }
     }

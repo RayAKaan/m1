@@ -375,10 +375,94 @@ static Pattern *parse_pattern(Parser *p) {
     return left;
 }
 
-/* ---- Expression parsing ---- */
-
+/* ---- Forward declarations for expression parsing (needed by interpolation) ---- */
 static Node *parse_expr(Parser *p);
 static Node *parse_impl(Parser *p);
+
+/* ---- String interpolation ---- */
+
+static int sv_has_char(StringView sv, char c) {
+    for (int i = 0; i < sv.len; i++)
+        if (sv.data[i] == c) return 1;
+    return 0;
+}
+
+/* Desugar "text {expr} text" into string_concat("text", int_to_string(expr), "text")
+ * Uses {{ for literal { and }} for literal }. */
+static Node *parse_interp_string(Parser *p, StringView sv, SrcLoc loc) {
+    Node *result = NULL;
+    int i = 0, seg_start = 0;
+
+#define CONCAT(node) do { \
+    if (!result) result = (node); \
+    else { \
+        Node **args = arena_alloc(p->arena, sizeof(Node*) * 2); \
+        args[0] = result; args[1] = (node); \
+        result = make_call(p, make_name(p, (StringView){"string_concat", 13}, loc), args, 2, loc); \
+    } \
+} while (0)
+
+    while (i < sv.len) {
+        if (sv.data[i] == '{' && i + 1 < sv.len && sv.data[i + 1] == '{') {
+            /* {{ → literal { */
+            StringView lit = { .data = sv.data + seg_start, .len = (i - seg_start) + 1 };
+            CONCAT(make_string(p, lit, loc));
+            i += 2;
+            seg_start = i;
+        } else if (sv.data[i] == '{') {
+            /* Emit preceding literal */
+            if (i > seg_start) {
+                StringView lit = { .data = sv.data + seg_start, .len = i - seg_start };
+                CONCAT(make_string(p, lit, loc));
+            }
+            i++; /* skip { */
+            /* Find matching } */
+            int expr_start = i;
+            while (i < sv.len && sv.data[i] != '}') i++;
+            if (i >= sv.len) {
+                error_report(PHASE_PARSER, loc, "unclosed '{' in interpolated string");
+                p->error_count++;
+                return result ? result : make_string(p, sv, loc);
+            }
+            /* Parse expression from expr_start */
+            StringView expr_sv = { .data = sv.data + expr_start, .len = i - expr_start };
+            Lexer sub_lex;
+            lexer_init(&sub_lex, expr_sv.data, expr_sv.len, loc.file, p->arena);
+            Parser sub = { .lexer = sub_lex, .arena = p->arena, .error_count = 0 };
+            sub.current = lexer_next(&sub.lexer);
+            Node *expr = parse_expr(&sub);
+            p->error_count += sub.error_count;
+            /* Wrap in int_to_string(expr) */
+            Node **int_args = arena_alloc(p->arena, sizeof(Node*) * 1);
+            int_args[0] = expr;
+            Node *to_str = make_call(p,
+                make_name(p, (StringView){"int_to_string", 13}, loc),
+                int_args, 1, loc);
+            CONCAT(to_str);
+            i++; /* skip } */
+            seg_start = i;
+        } else if (sv.data[i] == '}' && i + 1 < sv.len && sv.data[i + 1] == '}') {
+            /* }} → literal } */
+            StringView lit = { .data = sv.data + seg_start, .len = (i - seg_start) + 1 };
+            CONCAT(make_string(p, lit, loc));
+            i += 2;
+            seg_start = i;
+        } else {
+            i++;
+        }
+    }
+
+    /* Emit remaining literal */
+    if (i > seg_start) {
+        StringView lit = { .data = sv.data + seg_start, .len = i - seg_start };
+        CONCAT(make_string(p, lit, loc));
+    }
+
+#undef CONCAT
+    return result ? result : make_string(p, sv, loc);
+}
+
+/* ---- Expression parsing ---- */
 
 static Node *parse_atom(Parser *p) {
     SrcLoc loc = here(p);
@@ -393,6 +477,8 @@ static Node *parse_atom(Parser *p) {
     }
     if (peek(p) == TOK_STRING) {
         Token t = advance(p);
+        if (sv_has_char(t.data.str_val, '{'))
+            return parse_interp_string(p, t.data.str_val, loc);
         return make_string(p, t.data.str_val, loc);
     }
     if (peek(p) == TOK_CHAR) {

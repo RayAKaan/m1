@@ -20,6 +20,7 @@ module M1Lexer {
                | TkFreeze | TkNow | TkWwas | TkWhen | TkWill
                | TkWorld | TkDo | TkSet | TkPick | TkShape
                | TkLive | TkSay | TkShow | TkThen
+               | TkRequires | TkEnsures
 
     type M1Token = {
         kind : M1Tk,
@@ -157,8 +158,10 @@ module M1Lexer {
         if m0_string_eq(s, "say") == 1 { mk_str_tok(TkSay, s, line, col) } else {
         if m0_string_eq(s, "show") == 1 { mk_str_tok(TkShow, s, line, col) } else {
         if m0_string_eq(s, "then") == 1 { mk_str_tok(TkThen, s, line, col) } else {
+        if m0_string_eq(s, "requires") == 1 { mk_str_tok(TkRequires, s, line, col) } else {
+        if m0_string_eq(s, "ensures") == 1 { mk_str_tok(TkEnsures, s, line, col) } else {
         mk_str_tok(TkIdent, s, line, col)
-        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
     }
 
 
@@ -381,6 +384,8 @@ module M1Lexer {
             TkSay -> "SAY";
             TkShow -> "SHOW";
             TkThen -> "THEN";
+            TkRequires -> "REQUIRES";
+            TkEnsures -> "ENSURES";
         }
     }
 
