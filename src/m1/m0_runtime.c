@@ -555,3 +555,15 @@ int64_t float_gt(int64_t a, int64_t b) { return m1_float_gt(a, b); }
 int64_t float_eq(int64_t a, int64_t b) { return m1_float_eq(a, b); }
 char* float_to_string(int64_t f) { return m1_float_to_string(f); }
 int64_t string_to_float(const char* s) { return m1_string_to_float(s); }
+
+int64_t panic(int64_t code) {
+    fprintf(stderr, "panic: %lld\n", (long long)code);
+    exit((int)code);
+}
+int64_t __must(int64_t val) {
+    if (val == 0) {
+        fprintf(stderr, "__must: value was zero\n");
+        exit(1);
+    }
+    return val;
+}

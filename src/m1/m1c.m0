@@ -133,6 +133,10 @@ module M1C {
     let TK_THEN : Int = 64
     let TK_REQUIRES : Int = 65
     let TK_ENSURES : Int = 66
+    let TK_FN_REF : Int = 67
+    let TK_LAMBDA : Int = 68
+    let TK_PANIC : Int = 69
+    let TK_MUST : Int = 70
 
     let N_PROG : Int = 0
     let N_MOD : Int = 1
@@ -168,6 +172,7 @@ module M1C {
     let N_CONST_DECL : Int = 31
     let N_PICK : Int = 32
     let N_SHAPE : Int = 33
+    let N_FN_REF : Int = 34
 
     let T_NAMED : Int = 100
     let T_FN : Int = 101
@@ -357,6 +362,11 @@ module M1C {
         let s0 : Int = m0_store_string(n, 3, nm);
         let s1 : Int = m0_set(n, 4, ctors);
         let s2 : Int = m0_set(n, 5, cnt);
+        n
+    }
+    fn n_fn_ref(e : Int, line : Int, col : Int) -> Int {
+        let n : Int = nk(N_FN_REF, line, col, 4);
+        let s : Int = m0_set(n, 3, e);
         n
     }
     fn t_name(nm : String, line : Int, col : Int) -> Int {
@@ -623,7 +633,15 @@ module M1C {
         if ps_kind(s) == TK_MINUS {
             let r : PR = parse_unary(ps_adv(s));
             mk_pr(n_bin(OP_SUB, n_int(0, ps_line(s), ps_col(s)), r.node, ps_line(s), ps_col(s)), r.st)
-        } else { parse_postfix(s) }}
+        } else {
+        if ps_kind(s) == TK_MUST {
+            let r : PR = parse_unary(ps_adv(s));
+            mk_pr(n_call(n_name("__must", ps_line(s), ps_col(s)), m0_cons(r.node, m0_nil), 1, ps_line(s), ps_col(s)), r.st)
+        } else {
+        if ps_kind(s) == TK_FN_REF {
+            let sub : PR = parse_atom(ps_adv(s));
+            parse_postfix_loop(n_fn_ref(sub.node, ps_line(s), ps_col(s)), sub.st)
+        } else { parse_postfix(s) }}}}
     }
 
     fn parse_mul_loop(l : Int, s : PS) -> PR {
@@ -740,107 +758,7 @@ module M1C {
         }
     }
 
-    fn has_brace(s : String) -> Int {
-        let len : Int = m0_string_len(s);
-        let live i : Int = 0;
-        let live found : Int = 0;
-        let _ : Int = while i < len {
-            if m0_char_at(s, i) == 123 { found = 1 };
-            i = i + 1
-        };
-        found
-    }
-
-    fn parse_interp_string(s : PS, str_val : String, line : Int, col : Int) -> PR {
-        let len : Int = m0_string_len(str_val);
-        let live i : Int = 0;
-        let live seg_start : Int = 0;
-        let live result : Int = 0;
-        let live sub_err : Int = 0;
-        let b_open : Int = 123;
-        let b_close : Int = 125;
-        let _ : Int = while i < len {
-            let ch : Int = m0_char_at(str_val, i);
-            if ch == b_open {
-                let is_esc : Int = if i + 1 < len {
-                    if m0_char_at(str_val, i + 1) == b_open { 1 } else { 0 }
-                } else { 0 };
-                if is_esc == 1 {
-                    let lit : String = m0_substr(str_val, seg_start, i + 1);
-                    let lit_node : Int = n_str(lit, line, col);
-                    if result == 0 { result = lit_node } else {
-                        result = n_call(n_name("m0_string_concat", line, col),
-                            m0_cons(result, m0_cons(lit_node, m0_nil)), 2, line, col)
-                    };
-                    i = i + 2;
-                    seg_start = i
-                } else {
-                    if i > seg_start {
-                        let lit : String = m0_substr(str_val, seg_start, i);
-                        let lit_node : Int = n_str(lit, line, col);
-                        if result == 0 { result = lit_node } else {
-                            result = n_call(n_name("m0_string_concat", line, col),
-                                m0_cons(result, m0_cons(lit_node, m0_nil)), 2, line, col)
-                        }
-                    };
-                    i = i + 1;
-                    let expr_start : Int = i;
-                    let _ : Int = while i < len && m0_char_at(str_val, i) != b_close {
-                        i = i + 1
-                    };
-                    if i < len {
-                        let expr_str : String = m0_substr(str_val, expr_start, i);
-                        let sub_lx : M1Lexer = m1_lexer_init(expr_str);
-                        let sub_r : M1LexResult = m1_lexer_next(sub_lx);
-                        let sub_ps : PS = { tk = sub_r.token, lx = sub_r.lexer, err = 0 };
-                        let sub_pr : PR = parse_expr(sub_ps);
-                        sub_err = sub_err + sub_pr.st.err;
-                        let to_str : Int = n_call(n_name("m0_int_to_string", line, col),
-                            m0_cons(sub_pr.node, m0_nil), 1, line, col);
-                        if result == 0 { result = to_str } else {
-                            result = n_call(n_name("m0_string_concat", line, col),
-                                m0_cons(result, m0_cons(to_str, m0_nil)), 2, line, col)
-                        };
-                        i = i + 1;
-                        seg_start = i
-                    } else {
-                        i = i + 1
-                    }
-                }
-            } else {
-                if ch == b_close {
-                    let is_esc : Int = if i + 1 < len {
-                        if m0_char_at(str_val, i + 1) == b_close { 1 } else { 0 }
-                    } else { 0 };
-                    if is_esc == 1 {
-                        let lit : String = m0_substr(str_val, seg_start, i + 1);
-                        let lit_node : Int = n_str(lit, line, col);
-                        if result == 0 { result = lit_node } else {
-                            result = n_call(n_name("m0_string_concat", line, col),
-                                m0_cons(result, m0_cons(lit_node, m0_nil)), 2, line, col)
-                        };
-                        i = i + 2;
-                        seg_start = i
-                    } else {
-                        i = i + 1
-                    }
-                } else {
-                    i = i + 1
-                }
-            }
-        };
-        if i > seg_start {
-            let lit : String = m0_substr(str_val, seg_start, i);
-            let lit_node : Int = n_str(lit, line, col);
-            if result == 0 { result = lit_node } else {
-                result = n_call(n_name("m0_string_concat", line, col),
-                    m0_cons(result, m0_cons(lit_node, m0_nil)), 2, line, col)
-            }
-        };
-        if result == 0 { result = n_str(str_val, line, col) };
-        let s_adv : PS = ps_adv(s);
-        mk_pr(result, { tk = s_adv.tk, lx = s_adv.lx, err = s_adv.err + sub_err })
-    }
+    -- String interpolation with $"...{expr}..." syntax reserved for future use.
 
     fn parse_atom(s : PS) -> PR {
         let k : Int = ps_kind(s);
@@ -849,15 +767,15 @@ module M1C {
         if k == TK_INT { mk_pr(n_int(ps_int(s), line, col), ps_adv(s)) } else {
         if k == TK_STRING {
             let sv : String = ps_str(s);
-            if has_brace(sv) == 1 {
-                parse_interp_string(s, sv, line, col)
-            } else {
-                mk_pr(n_str(sv, line, col), ps_adv(s))
-            }
+            mk_pr(n_str(sv, line, col), ps_adv(s))
         } else {
         if k == TK_TRUE { mk_pr(n_bool(1, line, col), ps_adv(s)) } else {
         if k == TK_FALSE { mk_pr(n_bool(0, line, col), ps_adv(s)) } else {
         if k == TK_UNIT { mk_pr(n_unit(line, col), ps_adv(s)) } else {
+        if k == TK_PANIC {
+            let r : PR = parse_expr(ps_adv(s));
+            mk_pr(n_call(n_name("panic", line, col), m0_cons(r.node, m0_nil), 1, line, col), r.st)
+        } else {
         if k == TK_IDENT { mk_pr(n_name(ps_str(s), line, col), ps_adv(s)) } else {
         if k == TK_LET {
             let s_after_let : PS = ps_adv(s);
@@ -867,9 +785,16 @@ module M1C {
                               if is_mut == 1 { ps_adv(s_after_let) } else { s_after_let } };
             let nm : String = ps_str(nm_ps);
             let s_after_name : PS = ps_adv(nm_ps);
-            let s_after_colon : PS = ps_adv(s_after_name);
-            let tr : PR = parse_type_expr(s_after_colon);
-            let s_after_type : PS = ps_adv(tr.st);
+            let tr : PR = if ps_kind(s_after_name) == TK_COLON {
+                parse_type_expr(ps_adv(s_after_name))
+            } else {
+                mk_pr(n_unit(ps_line(s_after_name), ps_col(s_after_name)), s_after_name)
+            };
+            let s_after_type : PS = if ps_kind(s_after_name) == TK_COLON {
+                ps_adv(tr.st)
+            } else {
+                ps_adv(s_after_name)
+            };
             let vr : PR = parse_expr(s_after_type);
             let s_after_val : PS = ps_adv(vr.st);
             let br : PR = parse_expr(s_after_val);
@@ -885,9 +810,16 @@ module M1C {
             let nm_ps : PS = if is_live == 1 { ps_adv(s_after_set) } else { s_after_set };
             let nm : String = ps_str(nm_ps);
             let s_after_name : PS = ps_adv(nm_ps);
-            let s_after_colon : PS = ps_adv(s_after_name);
-            let tr : PR = parse_type_expr(s_after_colon);
-            let s_after_type : PS = ps_adv(tr.st);
+            let tr : PR = if ps_kind(s_after_name) == TK_COLON {
+                parse_type_expr(ps_adv(s_after_name))
+            } else {
+                mk_pr(n_unit(ps_line(s_after_name), ps_col(s_after_name)), s_after_name)
+            };
+            let s_after_type : PS = if ps_kind(s_after_name) == TK_COLON {
+                ps_adv(tr.st)
+            } else {
+                ps_adv(s_after_name)
+            };
             let vr : PR = parse_expr(s_after_type);
             let s_after_val : PS = ps_adv(vr.st);
             let br : PR = parse_expr(s_after_val);
@@ -1002,7 +934,7 @@ module M1C {
             mk_pr(r.node, ps_adv(r.st))
         } else {
             mk_pr(n_unit(line, col), ps_err(s))
-        }}}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn is_expr_start(k : Int) -> Int {
@@ -1026,7 +958,10 @@ module M1C {
         if k == TK_MINUS { 1 } else {
         if k == TK_TRUE { 1 } else {
         if k == TK_FALSE { 1 } else {
-        if k == TK_UNIT { 1 } else { 0 }}}}}}}}}}}}}}}}}}}}}
+        if k == TK_UNIT { 1 } else {
+        if k == TK_FN_REF { 1 } else {
+        if k == TK_PANIC { 1 } else {
+        if k == TK_MUST { 1 } else { 0 }}}}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn parse_decl(s : PS) -> PR {
@@ -1608,6 +1543,11 @@ module M1C {
             if m0_get(e, 3) == 1 { m0_print("1") } else { m0_print("0") }
         } else {
         if k == N_UNIT { m0_print("0") } else {
+        if k == N_FN_REF {
+            let _c0 : Int = m0_print("(int64_t)(");
+            let _c1 : Int = emit_c_expr(reg, m0_get(e, 3));
+            m0_print(")")
+        } else {
         if k == N_NAME {
             let nm : String = m0_load_string(e, 3);
             let ctor : Int = lookup_ctor_info(reg, nm);
@@ -1647,10 +1587,19 @@ module M1C {
                 let fnm : String = m0_load_string(func, 3);
                 let ctor : Int = lookup_ctor_info(reg, fnm);
                 if ctor == 0 {
-                    let _p0 : Int = m0_print(fnm);
-                    let _p1 : Int = m0_print("(");
-                    let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
-                    m0_print(")")
+                    let entry : Int = lookup_reg(reg, fnm);
+                    if entry == 0 {
+                        let _p0 : Int = m0_print("((int64_t (*)())");
+                        let _p1 : Int = m0_print(fnm);
+                        let _p2 : Int = m0_print(")(");
+                        let _p3 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
+                        m0_print(")")
+                    } else {
+                        let _p0 : Int = m0_print(fnm);
+                        let _p1 : Int = m0_print("(");
+                        let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
+                        m0_print(")")
+                    }
                 } else {
                     let sname : String = m0_load_string(ctor, 0);
                     let _p0 : Int = m0_print("(");
@@ -1666,7 +1615,7 @@ module M1C {
                     m0_print(" }")
                 }
             } else {
-                let _p0 : Int = emit_c_expr(reg, func);
+                let _p0 : Int = if m0_get(func, 0) == N_FN_REF { emit_c_expr(reg, m0_get(func, 3)) } else { emit_c_expr(reg, func) };
                 let _p1 : Int = m0_print("(");
                 let _p2 : Int = emit_c_expr_ea(reg, m0_get(e, 4), 1);
                 m0_print(")")
@@ -1835,7 +1784,7 @@ module M1C {
             m0_print(")")
         } else {
             m0_print("0")
-        }}}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn emit_c_params(reg : Int, params : Int) -> Int {
@@ -2163,6 +2112,9 @@ module M1C {
         if k == N_STRING { "String" } else {
         if k == N_BOOL { "Bool" } else {
         if k == N_UNIT { "Unit" } else {
+        if k == N_FN_REF {
+            tc_expr(reg, tenv, dc, m0_get(e, 3))
+        } else {
         if k == N_NAME {
             let nm : String = m0_load_string(e, 3);
             let t : String = tenv_lookup(tenv, nm);
@@ -2343,8 +2295,8 @@ module M1C {
         if k == N_FREEZE { "" } else {
         if k == N_WAS { "" } else {
         ""
-        }        }}}}}}}}}}}}}}}}}}}}}}}}
-
+        }        }}}}}}}}}}}}}}}}}}}}}}}}}
+    
     fn typecheck_module(reg : Int, decls : Int) -> Int {
         let dc : Int = tc_box(0);
         let _tc : Int = tc_module_decls(reg, dc, decls, m0_nil);
@@ -2389,6 +2341,8 @@ module M1C {
         let _hd : Int = m0_print("extern int64_t phase_graph_add_dep(char*, int64_t);\n");
         let _hc : Int = m0_print("extern int64_t phase_graph_now_recheck_count_for_var(char*);\n");
         let _hg : Int = m0_print("extern int64_t phase_graph_now_recheck_get_node_for_var(char*, int64_t);\n");
+        let _hp : Int = m0_print("extern int64_t panic(int64_t);\n");
+        let _hm : Int = m0_print("extern int64_t __must(int64_t);\n");
         let _hn : Int = m0_print("int64_t N_SEQ=15,N_LET=16,N_ASSIGN=22,N_FREEZE=25,N_WAS=26,N_IF=19,N_MATCH=18,N_PICK=32,N_WHILE=23,N_FOR=30,N_NAME=10,N_WHEN=29,N_NOW=28,N_WILL=27,N_BOOL=8,N_INT=6,N_STRING=7;\n\n");
         let _p0 : Int = emit_module_pass0(reg, decls);
         let _n0 : Int = m0_print("\n");

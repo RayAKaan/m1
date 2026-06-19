@@ -20,7 +20,8 @@ module M1Lexer {
                | TkFreeze | TkNow | TkWwas | TkWhen | TkWill
                | TkWorld | TkDo | TkSet | TkPick | TkShape
                | TkLive | TkSay | TkShow | TkThen
-               | TkRequires | TkEnsures
+                | TkRequires | TkEnsures
+                | TkFnRef | TkLambda | TkPanic | TkMust
 
     type M1Token = {
         kind : M1Tk,
@@ -160,8 +161,10 @@ module M1Lexer {
         if m0_string_eq(s, "then") == 1 { mk_str_tok(TkThen, s, line, col) } else {
         if m0_string_eq(s, "requires") == 1 { mk_str_tok(TkRequires, s, line, col) } else {
         if m0_string_eq(s, "ensures") == 1 { mk_str_tok(TkEnsures, s, line, col) } else {
+        if m0_string_eq(s, "panic") == 1 { mk_str_tok(TkPanic, s, line, col) } else {
+        if m0_string_eq(s, "must") == 1 { mk_str_tok(TkMust, s, line, col) } else {
         mk_str_tok(TkIdent, s, line, col)
-        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
     }
 
 
@@ -312,9 +315,10 @@ module M1Lexer {
         if c == 45 { { token = mk_tok(TkMinus, line, col), lexer = advance(l2) } } else {
         if c == 42 { { token = mk_tok(TkStar, line, col), lexer = advance(l2) } } else {
         if c == 47 { { token = mk_tok(TkSlash, line, col), lexer = advance(l2) } } else {
+        if c == 38 { { token = mk_tok(TkFnRef, line, col), lexer = advance(l2) } } else {
         if c == 37 { { token = mk_tok(TkPercent, line, col), lexer = advance(l2) } } else {
         { token = mk_tok(TkEof, line, col), lexer = advance(l2) }
-        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
     }
 
     fn tk_name(k : M1Tk) -> String {
@@ -386,6 +390,10 @@ module M1Lexer {
             TkThen -> "THEN";
             TkRequires -> "REQUIRES";
             TkEnsures -> "ENSURES";
+            TkFnRef -> "FN_REF";
+            TkLambda -> "LAMBDA";
+            TkPanic -> "PANIC";
+            TkMust -> "MUST";
         }
     }
 
