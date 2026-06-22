@@ -350,6 +350,53 @@ module M1C {
         let s1 : Int = m0_set(n, 4, body);
         n
     }
+
+    -- ========================================================
+    -- PHASE 1: Temporal Lowering + Clean Emission
+    -- ========================================================
+
+    fn lower_temporal(reg : Int, node : Int) -> Int {
+        let k : Int = m0_get(node, 0);
+        if k == N_FREEZE {
+            let nm : String = m0_load_string(node, 3);
+            let _ : Int = pg_freeze(nm);
+            node
+        } else {
+        if k == N_NOW {
+            let cond : Int = m0_get(node, 3);
+            let _cf : Int = register_constraint(cond, 0);
+            let _rc : Int = pg_rc_declare(cond);
+            let vars : Int = find_vars(cond, m0_nil);
+            let _ad : Int = emit_now_add_deps(cond, vars);
+            node
+        } else {
+        if k == N_WILL {
+            let cond : Int = m0_get(node, 3);
+            let _cf : Int = register_constraint(cond, 1);
+            let _ : Int = pg_wg_declare(cond);
+            node
+        } else {
+        if k == N_WAS {
+            node
+        } else {
+        if k == N_WHEN {
+            node
+        } else {
+            node
+        }}}}}
+    }
+
+    fn lower_decl(reg : Int, d : Int) -> Int {
+        let k : Int = m0_get(d, 0);
+        if k == N_FN_DECL {
+            let body : Int = m0_get(d, 6);
+            let new_body : Int = lower_temporal(reg, body);
+            let _ : Int = m0_set(d, 6, new_body);
+            d
+        } else {
+            d
+        }
+    }
     fn n_pick(sc : Int, arms : Int, cnt : Int, line : Int, col : Int) -> Int {
         let n : Int = nk(N_PICK, line, col, 6);
         let s0 : Int = m0_set(n, 3, sc);
@@ -1531,6 +1578,67 @@ module M1C {
         }
     }
 
+    fn emit_temporal_expr(reg : Int, e : Int) -> Int {
+        let k : Int = m0_get(e, 0);
+        if k == N_FREEZE {
+            let nm : String = m0_load_string(e, 3);
+            let _ : Int = pg_freeze(nm);
+            let _p : Int = m0_print("0");
+            0
+        } else {
+        if k == N_WAS {
+            let var_e : Int = m0_get(e, 3);
+            let ph : String = m0_load_string(e, 4);
+            let vn : String = extract_var_name(var_e);
+            let res : Int = pg_query(vn, ph);
+            if res == 1 { let _p : Int = m0_print("1"); 1 } else {
+            if res == 0 { let _p : Int = m0_print("0"); 0 } else {
+                let _q0 : Int = m0_print("phase_graph_query(\"");
+                let _q1 : Int = m0_print(vn);
+                let _q2 : Int = m0_print("\", \"");
+                let _q3 : Int = m0_print(ph);
+                let _q4 : Int = m0_print("\")");
+                0
+            }}
+        } else {
+        if k == N_WILL {
+            let cond : Int = m0_get(e, 3);
+            let _idx : Int = pg_wg_count();
+            let _p0 : Int = m0_print("(_will_flags[");
+            let _p1 : Int = m0_print_int(_idx);
+            let _p2 : Int = m0_print("] = (");
+            let _p3 : Int = emit_c_expr(reg, cond);
+            let _p4 : Int = m0_print("))");
+            0
+        } else {
+        if k == N_NOW {
+            let cond : Int = m0_get(e, 3);
+            let _p0 : Int = m0_print("({ if (!(");
+            let _p1 : Int = emit_c_expr(reg, cond);
+            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated at line ");
+            let _p3 : Int = m0_print_int(m0_get(cond, 1));
+            let _p4 : Int = m0_print(", col ");
+            let _p5 : Int = m0_print_int(m0_get(cond, 2));
+            let _p6 : Int = m0_print("\\n\"); } 0; })");
+            0
+        } else {
+        if k == N_WHEN {
+            let cond : Int = m0_get(e, 3);
+            let body : Int = m0_get(e, 4);
+            let _p0 : Int = m0_print("(");
+            let _p1 : Int = emit_c_expr(reg, cond);
+            let _p2 : Int = m0_print(" ? ");
+            let _b0 : Int = pg_enter_branch();
+            let _p3 : Int = emit_c_expr(reg, body);
+            let _b1 : Int = pg_exit_branch();
+            let _p4 : Int = m0_print(" : 0)");
+            0
+        } else {
+            let _p : Int = m0_print("0");
+            0
+        }}}}}
+    }
+
     fn emit_c_expr(reg : Int, e : Int) -> Int {
         let k : Int = m0_get(e, 0);
         if k == N_INT { m0_print_int(m0_get(e, 3)) } else {
@@ -1724,57 +1832,23 @@ module M1C {
             m0_print("; })")
         } else {
         if k == N_FREEZE {
-            let nm : String = m0_load_string(e, 3);
-            let _r : Int = pg_freeze(nm);
-            m0_print("0")
+            let _l : Int = lower_temporal(reg, e);
+            emit_temporal_expr(reg, e)
         } else {
         if k == N_WAS {
-            let var_e : Int = m0_get(e, 3);
-            let ph : String = m0_load_string(e, 4);
-            let vn : String = extract_var_name(var_e);
-            let res : Int = pg_query(vn, ph);
-            if res == 1 { m0_print("1") } else {
-            if res == 0 { m0_print("0") } else {
-                let _q0 : Int = m0_print("phase_graph_query(\"");
-                let _q1 : Int = m0_print(vn);
-                let _q2 : Int = m0_print("\", \"");
-                let _q3 : Int = m0_print(ph);
-                m0_print("\")")
-            }}
+            let _l : Int = lower_temporal(reg, e);
+            emit_temporal_expr(reg, e)
         } else {
         if k == N_WILL {
-            let _cf : Int = register_constraint(m0_get(e, 3), 1);
-            let _idx : Int = pg_wg_count();
-            let _reg : Int = pg_wg_declare(m0_get(e, 3));
-            let _p0 : Int = m0_print("(_will_flags[");
-            let _p1 : Int = m0_print_int(_idx);
-            let _p2 : Int = m0_print("] = (");
-            let _p3 : Int = emit_c_expr(reg, m0_get(e, 3));
-            m0_print("))")
+            let _l : Int = lower_temporal(reg, e);
+            emit_temporal_expr(reg, e)
         } else {
         if k == N_NOW {
-            let cond : Int = m0_get(e, 3);
-            let _cf : Int = register_constraint(cond, 0);
-            let _reg : Int = pg_rc_declare(cond);
-            let vars : Int = find_vars(cond, m0_nil);
-            let _ad : Int = emit_now_add_deps(cond, vars);
-            let _p0 : Int = m0_print("({ if (!(");
-            let _p1 : Int = emit_c_expr(reg, cond);
-            let _p2 : Int = m0_print(")) { fprintf(stderr, \"[M1100] now invariant violated at line ");
-            let _p3 : Int = m0_print_int(m0_get(cond, 1));
-            let _p4 : Int = m0_print(", col ");
-            let _p5 : Int = m0_print_int(m0_get(cond, 2));
-            let _p6 : Int = m0_print("\\n\"); } 0; })");
-            0
+            let _l : Int = lower_temporal(reg, e);
+            emit_temporal_expr(reg, e)
         } else {
         if k == N_WHEN {
-            let _p0 : Int = m0_print("(");
-            let _p1 : Int = emit_c_expr(reg, m0_get(e, 3));
-            let _p2 : Int = m0_print(" ? ");
-            let _b0 : Int = pg_enter_branch();
-            let _p3 : Int = emit_c_expr(reg, m0_get(e, 4));
-            let _b1 : Int = pg_exit_branch();
-            m0_print(" : 0)")
+            emit_temporal_expr(reg, e)
         } else {
         if k == N_SEQ {
             let _p0 : Int = m0_print("(");
